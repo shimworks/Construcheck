@@ -1,0 +1,6 @@
+services:
+  api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    volumes:
+      - ./src:/app/src  # hot reload em dev
