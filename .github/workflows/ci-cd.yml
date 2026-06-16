@@ -63,6 +63,7 @@ jobs:
           resourceGroup: construcheck-rg
           containerAppEnvironment: construcheck-env
           containerAppName: construcheck-api
+          acrName: ${{ secrets.ACR_NAME }}
           acrUsername: ${{ secrets.ACR_USERNAME }}
           acrPassword: ${{ secrets.ACR_PASSWORD }}
           registryUrl: ${{ secrets.ACR_LOGIN_SERVER }}
