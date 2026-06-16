@@ -63,6 +63,15 @@ jobs:
               "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
             }
 
+      - name: Vincular ACR ao Container App
+        run: |
+          az containerapp registry set \
+            --name construcheck-api \
+            --resource-group construcheck-rg \
+            --server ${{ secrets.ACR_LOGIN_SERVER }} \
+            --username ${{ secrets.ACR_USERNAME }} \
+            --password ${{ secrets.ACR_PASSWORD }}
+
       - name: Deploy no Azure Container Apps
         uses: azure/container-apps-deploy-action@v1
         with:
