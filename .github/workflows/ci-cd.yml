@@ -1,0 +1,80 @@
+name: CI/CD — Construcheck
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  ci:
+    name: Build e Testes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restaurar dependências
+        run: dotnet restore backend/construcheck.slnx
+
+      - name: Build
+        run: dotnet build backend/construcheck.slnx --no-restore --configuration Release
+
+      - name: Testes
+        run: dotnet test backend/construcheck.slnx --no-build --configuration Release --verbosity normal
+
+  cd:
+    name: Deploy para Produção
+    runs-on: ubuntu-latest
+    needs: ci  # só roda se o CI passou
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Login no Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build e Push da imagem Docker
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/dockerfile
+          push: true
+          tags: ${{ secrets.ACR_LOGIN_SERVER }}/construcheck-api:${{ github.sha }}
+
+      - name: Login no Azure
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId": "${{ secrets.AZURE_CLIENT_ID }}",
+              "clientSecret": "${{ secrets.AZURE_CLIENT_SECRET }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+            }
+
+      - name: Deploy no Azure Container Apps
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          resourceGroup: construcheck-rg
+          containerAppEnvironment: construcheck-env
+          containerAppName: construcheck-api
+          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/construcheck-api:${{ github.sha }}
+          environmentVariables: |
+            ASPNETCORE_ENVIRONMENT=Production
+            ASPNETCORE_URLS=http://+:8080
+            ConnectionStrings__DefaultConnection=${{ secrets.PROD_DB_CONNECTION_STRING }}
+            JWT_SECRET=${{ secrets.PROD_JWT_SECRET }}
+            JWT_ISSUER=construcheck-api
+            JWT_AUDIENCE=construcheck-client
+            JWT_EXPIRATION_MINUTES=60
