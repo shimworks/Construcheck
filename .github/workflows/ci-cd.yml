@@ -63,21 +63,15 @@ jobs:
               "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
             }
 
-      - name: Vincular ACR e resetar Container App
-        run: |
-          az containerapp update \
-            --name construcheck-api \
-            --resource-group construcheck-rg \
-            --registry-server ${{ secrets.ACR_LOGIN_SERVER }} \
-            --registry-username ${{ secrets.ACR_USERNAME }} \
-            --registry-password ${{ secrets.ACR_PASSWORD }}
-
       - name: Deploy no Azure Container Apps
         uses: azure/container-apps-deploy-action@v1
         with:
           resourceGroup: construcheck-rg
           containerAppEnvironment: construcheck-env
           containerAppName: construcheck-api
+          acrUsername: ${{ secrets.ACR_USERNAME }}
+          acrPassword: ${{ secrets.ACR_PASSWORD }}
+          registryUrl: ${{ secrets.ACR_LOGIN_SERVER }}
           imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/construcheck-api:${{ github.sha }}
           environmentVariables: |
             ASPNETCORE_ENVIRONMENT=Production
