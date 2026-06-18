@@ -69,4 +69,4 @@ jobs:
           # registryUrl: ${{ secrets.ACR_LOGIN_SERVER }}
           imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/construcheck-api:${{ github.sha }}
           targetPort: 8080
-          environmentVariables: ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://+:8080 ConnectionString="${{ secrets.PROD_DB_CONNECTION_STRING }}" JWT_SECRET="${{ secrets.PROD_JWT_SECRET }}" JWT_ISSUER=construcheck-api JWT_AUDIENCE=construcheck-client JWT_EXPIRATION_MINUTES=60
+          environmentVariables: '[{"name":"ASPNETCORE_ENVIRONMENT","value":"Production"},{"name":"ASPNETCORE_URLS","value":"http://+:8080"},{"name":"ConnectionString","value":"${{ secrets.PROD_DB_CONNECTION_STRING }}"},{"name":"JWT_SECRET","value":"${{ secrets.PROD_JWT_SECRET }}"},{"name":"JWT_ISSUER","value":"construcheck-api"},{"name":"JWT_AUDIENCE","value":"construcheck-client"},{"name":"JWT_EXPIRATION_MINUTES","value":"60"}]'
