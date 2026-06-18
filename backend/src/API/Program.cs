@@ -3,74 +3,151 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Construcheck.SharedKernel.Data;
+using Serilog;
 using System.Text;
 
-// Carrega o .env
-Env.Load();
+// Carrega o .env (somente em desenvolvimento)
+//Env.Load();
 
-var builder = WebApplication.CreateBuilder(args);
+// Bootstrap logger — captura erros durante o boot
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", Serilog.Events.LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .Enrich.WithMachineName()
+    .WriteTo.Console(new Serilog.Formatting.Compact.CompactJsonFormatter())
+    .WriteTo.File(
+        new Serilog.Formatting.Compact.CompactJsonFormatter(),
+        path: "logs/construcheck-.log",
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 7)
+    .CreateBootstrapLogger();
 
-// Connection string montada a partir do .env
-var connectionString =
-    $"Server={Environment.GetEnvironmentVariable("DB_SERVER")},{Environment.GetEnvironmentVariable("DB_PORT")};" +
-    $"Database={Environment.GetEnvironmentVariable("DB_NAME")};" +
-    $"User Id={Environment.GetEnvironmentVariable("DB_USER")};" +
-    $"Password={Environment.GetEnvironmentVariable("DB_PASSWORD")};" +
-    "TrustServerCertificate=True;";
+try
+{
+    Log.Information("Iniciando Construcheck API");
 
-// Banco de dados
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(connectionString));
+    var builder = WebApplication.CreateBuilder(args);
 
-// JWT
-var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET")!;
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
+    builder.Host.UseSerilog((context, services, configuration) =>
+        configuration
+            .MinimumLevel.Information()
+            .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
+            .MinimumLevel.Override("Microsoft.EntityFrameworkCore", Serilog.Events.LogEventLevel.Warning)
+            .Enrich.FromLogContext()
+            .Enrich.WithMachineName()
+            .WriteTo.Console(new Serilog.Formatting.Compact.CompactJsonFormatter())
+            .WriteTo.File(
+                new Serilog.Formatting.Compact.CompactJsonFormatter(),
+                path: "logs/construcheck-.log",
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: 7));
+
+    // Connection string — em produção vem de variável de ambiente injetada pelo pipeline
+    // Em desenvolvimento vem do .env
+    var connectionString = builder.Configuration["ConnectionString"]
+        ?? $"Server={builder.Configuration["DB_SERVER"]},{builder.Configuration["DB_PORT"]};" +
+           $"Database={builder.Configuration["DB_NAME"]};" +
+           $"User Id={builder.Configuration["DB_USER"]};" +
+           $"Password={builder.Configuration["DB_PASSWORD"]};" +
+           "TrustServerCertificate=True;";
+
+    // Banco de dados com retry automático para falhas transientes em runtime
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseSqlServer(connectionString, sqlOptions =>
         {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER"),
-            ValidAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE"),
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
-        };
+            sqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(10),
+                errorNumbersToAdd: null);
+        }));
+
+    // JWT
+    var jwtSecret = builder.Configuration["JWT_SECRET"]!;
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = builder.Configuration["JWT_ISSUER"],
+                ValidAudience = builder.Configuration["JWT_AUDIENCE"],
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
+            };
+        });
+
+    builder.Services.AddAuthorization();
+
+    // Exception Handler centralizado
+    builder.Services.AddExceptionHandler<Construcheck.API.Middleware.GlobalExceptionHandler>();
+    builder.Services.AddProblemDetails();
+
+    builder.Services.AddControllers();
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen();
+
+    // CORS para o Angular
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("Angular", policy =>
+            policy.WithOrigins("http://localhost:4200")
+                  .AllowAnyHeader()
+                  .AllowAnyMethod());
     });
 
-builder.Services.AddAuthorization();
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+    var app = builder.Build();
 
-// CORS para o Angular
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("Angular", policy =>
-        policy.WithOrigins("http://localhost:4200")
-              .AllowAnyHeader()
-              .AllowAnyMethod());
-});
+    app.UseSerilogRequestLogging(options =>
+    {
+        options.MessageTemplate = "{RequestMethod} {RequestPath} respondeu {StatusCode} em {Elapsed:0.0000}ms";
+    });
 
-var app = builder.Build();
+    // Aplica migrations com retry — tolera banco momentaneamente indisponível no startup
+    using (var scope = app.Services.CreateScope())
+    {
+        var maxRetries = 5;
+        var delay = TimeSpan.FromSeconds(5);
 
-// Aplica migrations automaticamente ao subir
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                db.Database.Migrate();
+                break;
+            }
+            catch (Exception ex)
+            {
+                if (i == maxRetries - 1) throw;
+                Log.Warning(ex, "Banco indisponível. Tentativa {Attempt} de {Max}. Aguardando...", i + 1, maxRetries);
+                await Task.Delay(delay);
+            }
+        }
+    }
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI();
+    }
+
+    app.UseExceptionHandler();
+    app.UseCors("Angular");
+    app.UseAuthentication();
+    app.UseAuthorization();
+    app.MapControllers();
+
+    app.Run();
 }
-
-if (app.Environment.IsDevelopment())
+catch (Exception ex)
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    Log.Fatal(ex, "Aplicação encerrou inesperadamente durante o boot");
 }
-
-app.UseCors("Angular");
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
-
-app.Run();
+finally
+{
+    await Log.CloseAndFlushAsync();
+}
