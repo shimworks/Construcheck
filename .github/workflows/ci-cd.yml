@@ -72,7 +72,7 @@ jobs:
           environmentVariables: |
             ASPNETCORE_ENVIRONMENT=Production
             ASPNETCORE_URLS=http://+:8080
-            ConnectionStrings=${{ secrets.PROD_DB_CONNECTION_STRING }}
+            ConnectionString=${{ secrets.PROD_DB_CONNECTION_STRING }}
             JWT_SECRET=${{ secrets.PROD_JWT_SECRET }}
             JWT_ISSUER=construcheck-api
             JWT_AUDIENCE=construcheck-client
