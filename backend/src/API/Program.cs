@@ -46,12 +46,34 @@ try
 
     // Connection string — em produção vem de variável de ambiente injetada pelo pipeline
     // Em desenvolvimento vem do .env
-    var connectionString = builder.Configuration["ConnectionString"]
-        ?? $"Server={builder.Configuration["DB_SERVER"]},{builder.Configuration["DB_PORT"]};" +
-           $"Database={builder.Configuration["DB_NAME"]};" +
-           $"User Id={builder.Configuration["DB_USER"]};" +
-           $"Password={builder.Configuration["DB_PASSWORD"]};" +
-           "TrustServerCertificate=True;";
+    var test = builder.Configuration.AddUserSecrets<Program>();
+
+    string connectionString = string.Empty;
+    var server = builder.Configuration["DB_SERVER"];
+    var port = builder.Configuration["DB_PORT"];
+    var database = builder.Configuration["DB_NAME"];
+    var user = builder.Configuration["DB_USER"];
+    var password = builder.Configuration["DB_PASSWORD"];
+    if (string.IsNullOrEmpty(server)) Log.Error("***************************************** SERVER IS EMPTY ***********************************************************");
+
+    var enviromentTeste = builder.Environment.IsProduction();
+    if (enviromentTeste)
+    {
+        connectionString = $"Server=tcp:{server},{port};Initial " +
+            $"Catalog={database};Persist Security Info=False;" +
+            $"User ID={user};Password={password};" +
+            $"MultipleActiveResultSets=False;Encrypt=True;" +
+            $"TrustServerCertificate=False;Connection Timeout=30;";
+    }
+    else
+    {
+        connectionString = $"Server={server},{port};" +
+            $"Database={database};" +
+            $"User Id={user};" +
+            $"Password={password};" +
+            "TrustServerCertificate=True;";
+    }
+
 
     // Banco de dados com retry automático para falhas transientes em runtime
     builder.Services.AddDbContext<AppDbContext>(options =>
