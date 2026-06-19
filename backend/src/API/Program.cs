@@ -46,8 +46,6 @@ try
 
     // Connection string — em produção vem de variável de ambiente injetada pelo pipeline
     // Em desenvolvimento vem do .env
-    var test = builder.Configuration.AddUserSecrets<Program>();
-
     string connectionString = string.Empty;
     var server = builder.Configuration["DB_SERVER"];
     var port = builder.Configuration["DB_PORT"];
@@ -56,8 +54,7 @@ try
     var password = builder.Configuration["DB_PASSWORD"];
     if (string.IsNullOrEmpty(server)) Log.Error("***************************************** SERVER IS EMPTY ***********************************************************");
 
-    var enviromentTeste = builder.Environment.IsProduction();
-    if (enviromentTeste)
+    if (builder.Environment.IsProduction())
     {
         connectionString = $"Server=tcp:{server},{port};Initial " +
             $"Catalog={database};Persist Security Info=False;" +
