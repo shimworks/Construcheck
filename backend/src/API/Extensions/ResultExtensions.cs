@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Construcheck.SharedKernel;
 
-namespace Construcheck.Extensions;
+namespace Construcheck.API.Extensions;
 
 public static class ResultExtensions
 {
