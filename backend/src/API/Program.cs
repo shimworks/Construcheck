@@ -1,13 +1,9 @@
-using DotNetEnv;
-using Microsoft.EntityFrameworkCore;
+using Construcheck.API.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Construcheck.SharedKernel.Data;
 using Serilog;
 using System.Text;
-
-// Carrega o .env (somente em desenvolvimento)
-//Env.Load();
 
 // Bootstrap logger — captura erros durante o boot
 Log.Logger = new LoggerConfiguration()
