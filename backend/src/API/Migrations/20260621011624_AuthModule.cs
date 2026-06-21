@@ -2,10 +2,10 @@
 
 #nullable disable
 
-namespace SharedKernel.Migrations
+namespace API.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class AuthModule : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
