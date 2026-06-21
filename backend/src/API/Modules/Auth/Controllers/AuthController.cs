@@ -1,6 +1,7 @@
 ﻿using Construcheck.API.Extensions;
 using Construcheck.API.Modules.Auth.DTOs;
 using Construcheck.API.Modules.Auth.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 
@@ -42,8 +43,47 @@ public class AuthController(IAuthService authService) : ControllerBase
         return Ok(new { accessToken = result.Value.AccessToken });
     }
 
-    // Refresh e Logout — adicionados no Tópico 5
-    // UpdateUserRoles — adicionado no Tópico 6
+    [HttpPost("refresh")]
+    public async Task<IActionResult> Refresh(CancellationToken ct)
+    {
+        var token = Request.Cookies[RefreshTokenCookieName];
+
+        if (string.IsNullOrEmpty(token))
+            return Unauthorized(new { error = "Refresh token ausente." });
+
+        var result = await authService.RefreshAsync(token, ct);
+
+        if (result.IsFailure)
+            return result.ToActionResult(this);
+
+        SetRefreshTokenCookie(result.Value!.RefreshToken);
+
+        return Ok(new { accessToken = result.Value.AccessToken });
+    }
+
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout(CancellationToken ct)
+    {
+        var token = Request.Cookies[RefreshTokenCookieName];
+
+        if (!string.IsNullOrEmpty(token))
+            await authService.LogoutAsync(token, ct);
+
+        Response.Cookies.Delete(RefreshTokenCookieName);
+
+        return NoContent();
+    }
+
+    [HttpPut("users/{id:guid}/roles")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UpdateUserRoles(
+        Guid id,
+        [FromBody] UpdateUserRolesRequest request,
+        CancellationToken ct)
+    {
+        var result = await authService.UpdateUserRolesAsync(id, request, ct);
+        return result.ToActionResult(this);
+    }
 
     private void SetRefreshTokenCookie(string token)
     {

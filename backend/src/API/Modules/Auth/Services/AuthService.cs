@@ -40,7 +40,6 @@ public class AuthService(IAuthRepository repository, TokenService tokenService) 
         return Result<AuthResponse>.Success(new AuthResponse(accessToken, refreshToken.Token));
     }
 
-    // Login, Refresh, Logout e UpdateUserRoles — implementados nos tópicos seguintes
     public async Task<Result<AuthResponse>> LoginAsync(LoginRequest request, CancellationToken ct = default)
     {
         var user = await repository.GetByEmailAsync(request.Email, ct);
@@ -88,6 +87,22 @@ public class AuthService(IAuthRepository repository, TokenService tokenService) 
         return Result<bool>.Success(true);
     }
 
-    public Task<Result<bool>> UpdateUserRolesAsync(Guid userId, UpdateUserRolesRequest request, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+    public async Task<Result<bool>> UpdateUserRolesAsync(Guid userId, UpdateUserRolesRequest request, CancellationToken ct = default)
+    {
+        var user = await repository.GetByIdWithRolesAsync(userId, ct);
+        if (user is null)
+            return Result<bool>.NotFound("Usuário não encontrado.");
+
+        if (request.RoleIds.Count == 0)
+            return Result<bool>.Validation("Informe ao menos uma role.");
+
+        var roles = await repository.GetRolesByIdsAsync(request.RoleIds, ct);
+        if (roles.Count != request.RoleIds.Count)
+            return Result<bool>.Validation("Uma ou mais roles informadas não existem.");
+
+        await repository.UpdateUserRolesAsync(user, roles, ct);
+        await repository.SaveChangesAsync(ct);
+
+        return Result<bool>.Success(true);
+    }
 }
