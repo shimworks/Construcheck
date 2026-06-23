@@ -22,8 +22,8 @@ public class AuthRepository(AppDbContext db) : IAuthRepository
     public Task<Role?> GetRoleByNameAsync(string name, CancellationToken ct = default) =>
         db.Roles.FirstOrDefaultAsync(r => r.Name == name, ct);
 
-    public Task<List<Role>> GetRolesByIdsAsync(List<Guid> roleIds, CancellationToken ct = default) =>
-        db.Roles.Where(r => roleIds.Contains(r.Id)).ToListAsync(ct);
+    public Task<List<Role>> GetRolesByNamesAsync(List<string> names, CancellationToken ct = default) =>
+        db.Roles.Where(r => names.Contains(r.Name)).ToListAsync(ct);
 
     public async Task AddUserAsync(User user, CancellationToken ct = default) =>
         await db.Users.AddAsync(user, ct);

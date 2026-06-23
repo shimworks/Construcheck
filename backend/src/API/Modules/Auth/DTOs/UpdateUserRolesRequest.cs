@@ -1,3 +1,5 @@
-﻿namespace Construcheck.API.Modules.Auth.DTOs;
+﻿using Construcheck.API.Modules.Auth.Enums;
 
-public record UpdateUserRolesRequest(List<Guid> RoleIds);
+namespace Construcheck.API.Modules.Auth.DTOs;
+
+public record UpdateUserRolesRequest(List<RoleType> Roles);

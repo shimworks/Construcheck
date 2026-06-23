@@ -8,15 +8,15 @@ namespace Construcheck.API.Modules.Auth.Services;
 
 public class AuthService(IAuthRepository repository, TokenService tokenService) : IAuthService
 {
-    public async Task<Result<AuthResponse>> RegisterAsync(RegisterRequest request, CancellationToken ct = default)
+    public async Task<Result<bool>> RegisterAsync(RegisterUserRequest request, CancellationToken ct = default)
     {
         var existing = await repository.GetByEmailAsync(request.Email, ct);
         if (existing is not null)
-            return Result<AuthResponse>.Conflict("E-mail já cadastrado.");
+            return Result<bool>.Conflict("E-mail já cadastrado.");
 
         var viewerRole = await repository.GetRoleByNameAsync("Viewer", ct);
         if (viewerRole is null)
-            return Result<AuthResponse>.Failure("Role padrão não encontrada. Verifique o seed do banco.");
+            return Result<bool>.Failure("Role padrão não encontrada. Verifique o seed do banco.");
 
         var user = new User
         {
@@ -30,14 +30,9 @@ public class AuthService(IAuthRepository repository, TokenService tokenService) 
         user.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = viewerRole.Id, Role = viewerRole });
 
         await repository.AddUserAsync(user, ct);
-
-        var refreshToken = tokenService.GenerateRefreshToken(user.Id);
-        await repository.AddRefreshTokenAsync(refreshToken, ct);
         await repository.SaveChangesAsync(ct);
 
-        var accessToken = tokenService.GenerateAccessToken(user);
-
-        return Result<AuthResponse>.Success(new AuthResponse(accessToken, refreshToken.Token));
+        return Result<bool>.Success(true);
     }
 
     public async Task<Result<AuthResponse>> LoginAsync(LoginRequest request, CancellationToken ct = default)
@@ -93,11 +88,12 @@ public class AuthService(IAuthRepository repository, TokenService tokenService) 
         if (user is null)
             return Result<bool>.NotFound("Usuário não encontrado.");
 
-        if (request.RoleIds.Count == 0)
+        if (request.Roles.Count == 0)
             return Result<bool>.Validation("Informe ao menos uma role.");
 
-        var roles = await repository.GetRolesByIdsAsync(request.RoleIds, ct);
-        if (roles.Count != request.RoleIds.Count)
+        var roleNames = request.Roles.Select(r => r.ToString()).ToList();
+        var roles = await repository.GetRolesByNamesAsync(roleNames, ct);
+        if (roles.Count != request.Roles.Count)
             return Result<bool>.Validation("Uma ou mais roles informadas não existem.");
 
         await repository.UpdateUserRolesAsync(user, roles, ct);

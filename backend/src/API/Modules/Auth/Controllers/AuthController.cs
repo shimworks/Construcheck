@@ -15,7 +15,7 @@ public class AuthController(IAuthService authService) : ControllerBase
 
     [HttpPost("register")]
     public async Task<IActionResult> Register(
-        [FromBody] RegisterRequest request,
+        [FromBody] RegisterUserRequest request,
         CancellationToken ct)
     {
         var result = await authService.RegisterAsync(request, ct);
@@ -23,9 +23,7 @@ public class AuthController(IAuthService authService) : ControllerBase
         if (result.IsFailure)
             return result.ToActionResult(this);
 
-        SetRefreshTokenCookie(result.Value!.RefreshToken);
-
-        return Ok(new { accessToken = result.Value.AccessToken });
+        return Created(string.Empty, null);
     }
 
     [HttpPost("login")]

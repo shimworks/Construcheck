@@ -6,7 +6,7 @@ namespace Construcheck.API.Modules.Auth.Interfaces;
 
 public interface IAuthService
 {
-    Task<Result<AuthResponse>> RegisterAsync(RegisterRequest request, CancellationToken ct = default);
+    Task<Result<bool>> RegisterAsync(RegisterUserRequest request, CancellationToken ct = default);
     Task<Result<AuthResponse>> LoginAsync(LoginRequest request, CancellationToken ct = default);
     Task<Result<AuthResponse>> RefreshAsync(string refreshToken, CancellationToken ct = default);
     Task<Result<bool>> LogoutAsync(string refreshToken, CancellationToken ct = default);

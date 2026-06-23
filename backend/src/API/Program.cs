@@ -1,4 +1,5 @@
 using Construcheck.API.Data;
+using Construcheck.API.Modules.Auth;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -96,6 +97,7 @@ try
         });
 
     builder.Services.AddAuthorization();
+    builder.Services.AddAuthModule();
 
     // Exception Handler centralizado
     builder.Services.AddExceptionHandler<Construcheck.API.Middleware.GlobalExceptionHandler>();
