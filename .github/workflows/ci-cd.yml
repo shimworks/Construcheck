@@ -69,7 +69,7 @@ jobs:
           # registryUrl: ${{ secrets.ACR_LOGIN_SERVER }}
           imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/construcheck-api:${{ github.sha }}
           targetPort: 8080
-          environmentVariables: |
+          environmentVariables: >
             ASPNETCORE_ENVIRONMENT=Production
             ASPNETCORE_URLS=http://+:8080
             DB_SERVER=construcheck-sql-server.database.windows.net
