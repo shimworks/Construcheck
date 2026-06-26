@@ -99,3 +99,4 @@ jobs:
             JWT_AUDIENCE=construcheck-client
             JWT_EXPIRATION_MINUTES=60
             CONSTRING=secretref:fakecon
+            REFRESH_TOKEN_EXPIRATION_DAYS=7
