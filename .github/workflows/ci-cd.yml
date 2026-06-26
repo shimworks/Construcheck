@@ -31,7 +31,7 @@ jobs:
   cd:
     name: Deploy para Produção
     runs-on: ubuntu-latest
-    needs: ci  # só roda se o CI passou
+    needs: ci
     permissions:
       id-token: write
       contents: read
@@ -40,20 +40,21 @@ jobs:
       - name: Checkout do código
         uses: actions/checkout@v4
 
-      - name: Login no Azure (Via OIDC ou credencial existente)
+      - name: Login no Azure (Via OIDC)
         uses: azure/login@v2
         with:
-          # Exemplo usando OIDC (Recomendado):
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Buscar segredos do Azure Key Vault
-        uses: azure/get-keyvault-secrets@v1
-        id: kv_secrets # ID para referenciar os outputs depois
+      - name: Buscar APENAS a senha do ACR via Azure CLI
+        uses: azure/cli@v2
+        id: kv_secrets
         with:
-          keyvault: "construcheckvault" # Nome do recurso no Azure
-          secrets: 'ACR-PASSWORD, DB-PASSWORD, JWT-SECRET' # Lista separada por vírgulas
+          inlineScript: |
+            ACR_PWD=$(az keyvault secret show --name "ACR-PASSWORD" --vault-name "construcheckvault" --query value -o tsv)
+            echo "::add-mask::$ACR_PWD"
+            echo "ACR-PASSWORD=$ACR_PWD" >> $GITHUB_OUTPUT
 
       - name: Login no Azure Container Registry
         uses: docker/login-action@v3
@@ -70,11 +71,6 @@ jobs:
           push: true
           tags: ${{ secrets.ACR_LOGIN_SERVER }}/construcheck-api:${{ github.sha }}
 
-      # - name: Login no Azure
-      #   uses: azure/login@v2
-      #   with:
-      #     creds: ${{ secrets.AZURE_CREDENTIALS }}
-
       - name: Deploy no Azure Container Apps
         uses: azure/container-apps-deploy-action@v1
         with:
@@ -83,8 +79,7 @@ jobs:
           containerAppName: construcheck-api
           acrName: ${{ secrets.ACR_NAME }}
           acrUsername: ${{ secrets.ACR_USERNAME }}
-          acrPassword: ${{ steps.kv_secrets.outputs.ACR-PASSWORD }}
-          # registryUrl: ${{ secrets.ACR_LOGIN_SERVER }}
+          acrPassword: ${{ steps.kv_secrets.outputs.ACR-PASSWORD }} # Usado para o Container Apps baixar a imagem do ACR
           imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/construcheck-api:${{ github.sha }}
           targetPort: 8080
           secrets: >
