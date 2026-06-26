@@ -3,4 +3,11 @@
     <Project Path="src/API/API.csproj" />
     <Project Path="src/SharedKernel/SharedKernel.csproj" />
   </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/Integration/">
+    <Project Path="tests/Integration/Construcheck.Integration.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Unit/">
+    <Project Path="tests/Unit/Construcheck.Unit.Tests.csproj" />
+  </Folder>
 </Solution>
