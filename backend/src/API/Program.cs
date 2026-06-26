@@ -50,6 +50,8 @@ try
     var database = builder.Configuration["DB_NAME"];
     var user = builder.Configuration["DB_USER"];
     var password = builder.Configuration["DB_PASSWORD"];
+    var fakestring = builder.Configuration["CONSTRING"];
+    Log.Error(fakestring);
     if (string.IsNullOrEmpty(server)) Log.Error("***************************************** SERVER IS EMPTY ***********************************************************");
 
     if (builder.Environment.IsProduction())

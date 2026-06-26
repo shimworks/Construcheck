@@ -90,6 +90,7 @@ jobs:
           secrets: >
             db-password-secret=keyvaultref:https://construcheckvault.vault.azure.net/secrets/DB-PASSWORD/61aaaf29d5fb41beab6514cda118e63f
             jwt-secret-secret=keyvaultref:https://construcheckvault.vault.azure.net/secrets/JWT-SECRET/148db44880e84d49980d27d676012bb9
+            fakecon=keyvaultref:https://construcheckvault.vault.azure.net/secrets/fakecon/78372bddb0114129a2f191d95a36740f
           environmentVariables: >
             ASPNETCORE_ENVIRONMENT=Production
             ASPNETCORE_URLS=http://+:8080
@@ -102,3 +103,4 @@ jobs:
             JWT_ISSUER=construcheck-api
             JWT_AUDIENCE=construcheck-client
             JWT_EXPIRATION_MINUTES=60
+            CONSTRING=secretref:fakecon
