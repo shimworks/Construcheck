@@ -102,4 +102,3 @@ jobs:
             JWT_ISSUER=construcheck-api
             JWT_AUDIENCE=construcheck-client
             JWT_EXPIRATION_MINUTES=60
-            CONSTRING=Server=tcp:construcheck-sql-server.database.windows.net,1433;Initial Catalog=construcheck-db;Persist Security Info=False;User ID=construcheck_admin;Password=notreal;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
