@@ -32,17 +32,35 @@ jobs:
     name: Deploy para Produção
     runs-on: ubuntu-latest
     needs: ci  # só roda se o CI passou
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - name: Checkout do código
         uses: actions/checkout@v4
+
+      - name: Login no Azure (Via OIDC ou credencial existente)
+        uses: azure/login@v2
+        with:
+          # Exemplo usando OIDC (Recomendado):
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Buscar segredos do Azure Key Vault
+        uses: azure/get-keyvault-secrets@v1
+        id: kv_secrets # ID para referenciar os outputs depois
+        with:
+          keyvault: "construcheckvault" # Nome do recurso no Azure
+          secrets: 'ACR-PASSWORD, DB-PASSWORD, JWT-SECRET' # Lista separada por vírgulas
 
       - name: Login no Azure Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ secrets.ACR_LOGIN_SERVER }}
           username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
+          password: ${{ steps.kv_secrets.outputs.ACR-PASSWORD }}
 
       - name: Build e Push da imagem Docker
         uses: docker/build-push-action@v5
@@ -52,10 +70,10 @@ jobs:
           push: true
           tags: ${{ secrets.ACR_LOGIN_SERVER }}/construcheck-api:${{ github.sha }}
 
-      - name: Login no Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      # - name: Login no Azure
+      #   uses: azure/login@v2
+      #   with:
+      #     creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Deploy no Azure Container Apps
         uses: azure/container-apps-deploy-action@v1
@@ -65,7 +83,7 @@ jobs:
           containerAppName: construcheck-api
           acrName: ${{ secrets.ACR_NAME }}
           acrUsername: ${{ secrets.ACR_USERNAME }}
-          acrPassword: ${{ secrets.ACR_PASSWORD }}
+          acrPassword: ${{ steps.kv_secrets.outputs.ACR-PASSWORD }}
           # registryUrl: ${{ secrets.ACR_LOGIN_SERVER }}
           imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/construcheck-api:${{ github.sha }}
           targetPort: 8080
@@ -74,10 +92,10 @@ jobs:
             ASPNETCORE_URLS=http://+:8080
             DB_SERVER=construcheck-sql-server.database.windows.net
             DB_PORT=1433
-            DB_NAME=construcheck-db
+            DB_NAME=construcheck_db
             DB_USER=construcheck_admin
-            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-            JWT_SECRET=${{ secrets.PROD_JWT_SECRET }}
+            DB_PASSWORD=${{ steps.kv_secrets.outputs.DB-PASSWORD }}
+            JWT_SECRET=${{ steps.kv_secrets.outputs.PROD-JWT-SECRET }}
             JWT_ISSUER=construcheck-api
             JWT_AUDIENCE=construcheck-client
             JWT_EXPIRATION_MINUTES=60
