@@ -95,10 +95,11 @@ jobs:
             ASPNETCORE_URLS=http://+:8080
             DB_SERVER=construcheck-sql-server.database.windows.net
             DB_PORT=1433
-            DB_NAME=construcheck_db
+            DB_NAME=construcheck-db
             DB_USER=construcheck_admin
             DB_PASSWORD=secretref:db-password-secret
             JWT_SECRET=secretref:jwt-secret-secret
             JWT_ISSUER=construcheck-api
             JWT_AUDIENCE=construcheck-client
             JWT_EXPIRATION_MINUTES=60
+            CONSTRING=Server=tcp:construcheck-sql-server.database.windows.net,1433;Initial Catalog=construcheck-db;Persist Security Info=False;User ID=construcheck_admin;Password=notreal;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
