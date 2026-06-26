@@ -87,6 +87,9 @@ jobs:
           # registryUrl: ${{ secrets.ACR_LOGIN_SERVER }}
           imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/construcheck-api:${{ github.sha }}
           targetPort: 8080
+          secrets: >
+            db-password-secret=keyvaultref:https://construcheckvault.vault.azure.net/secrets/DB-PASSWORD/61aaaf29d5fb41beab6514cda118e63f
+            jwt-secret-secret=keyvaultref:https://construcheckvault.vault.azure.net/secrets/JWT-SECRET/148db44880e84d49980d27d676012bb9
           environmentVariables: >
             ASPNETCORE_ENVIRONMENT=Production
             ASPNETCORE_URLS=http://+:8080
@@ -94,8 +97,8 @@ jobs:
             DB_PORT=1433
             DB_NAME=construcheck_db
             DB_USER=construcheck_admin
-            DB_PASSWORD=${{ steps.kv_secrets.outputs.DB-PASSWORD }}
-            JWT_SECRET=${{ steps.kv_secrets.outputs.PROD-JWT-SECRET }}
+            DB_PASSWORD=secretref:db-password-secret
+            JWT_SECRET=secretref:jwt-secret-secret
             JWT_ISSUER=construcheck-api
             JWT_AUDIENCE=construcheck-client
             JWT_EXPIRATION_MINUTES=60
