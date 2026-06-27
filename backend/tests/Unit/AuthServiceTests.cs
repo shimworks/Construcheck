@@ -11,13 +11,13 @@ namespace Construcheck.Unit.Tests.Auth.Services;
 public class AuthServiceTests
 {
     private readonly IAuthRepository _repository;
-    private readonly TokenService _tokenService;
+    private readonly ITokenService _tokenService;
     private readonly AuthService _sut;
 
     public AuthServiceTests()
     {
         _repository = Substitute.For<IAuthRepository>();
-        _tokenService = Substitute.For<TokenService>();
+        _tokenService = Substitute.For<ITokenService>();
         _sut = new AuthService(_repository, _tokenService);
     }
 
@@ -26,10 +26,10 @@ public class AuthServiceTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task RegisterAsync_DeveRetornarConflict_QuandoEmailJaCadastrado()
+    public async Task RegisterAsync_ShouldReturnConflict_WhenEmailAlreadyExists()
     {
         // Arrange
-        var request = new RegisterUserRequest("user@test.com", "Senha123!");
+        var request = new RegisterUserRequest("user@test.com", "Password123!");
         _repository.GetByEmailAsync(request.Email, Arg.Any<CancellationToken>())
                    .Returns(new User { Email = request.Email });
 
@@ -43,10 +43,10 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task RegisterAsync_DeveRetornarFailure_QuandoRoleViewerNaoEncontrada()
+    public async Task RegisterAsync_ShouldReturnFailure_WhenViewerRoleNotFound()
     {
         // Arrange
-        var request = new RegisterUserRequest("novo@test.com", "Senha123!");
+        var request = new RegisterUserRequest("new@test.com", "Password123!");
         _repository.GetByEmailAsync(request.Email, Arg.Any<CancellationToken>())
                    .Returns((User?)null);
         _repository.GetRoleByNameAsync("Viewer", Arg.Any<CancellationToken>())
@@ -61,10 +61,10 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task RegisterAsync_DeveCriarUsuario_ComRoleViewer()
+    public async Task RegisterAsync_ShouldCreateUser_WithViewerRole()
     {
         // Arrange
-        var request = new RegisterUserRequest("novo@test.com", "Senha123!");
+        var request = new RegisterUserRequest("new@test.com", "Password123!");
         var viewerRole = new Role { Id = Guid.NewGuid(), Name = "Viewer" };
 
         _repository.GetByEmailAsync(request.Email, Arg.Any<CancellationToken>())
@@ -72,9 +72,9 @@ public class AuthServiceTests
         _repository.GetRoleByNameAsync("Viewer", Arg.Any<CancellationToken>())
                    .Returns(viewerRole);
 
-        User? usuarioCriado = null;
+        User? createdUser = null;
         await _repository.AddUserAsync(
-            Arg.Do<User>(u => usuarioCriado = u),
+            Arg.Do<User>(u => createdUser = u),
             Arg.Any<CancellationToken>());
 
         // Act
@@ -82,18 +82,18 @@ public class AuthServiceTests
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.NotNull(usuarioCriado);
-        Assert.Equal("novo@test.com", usuarioCriado.Email);
-        Assert.Single(usuarioCriado.UserRoles);
-        Assert.Equal(viewerRole.Id, usuarioCriado.UserRoles.First().RoleId);
+        Assert.NotNull(createdUser);
+        Assert.Equal("new@test.com", createdUser.Email);
+        Assert.Single(createdUser.UserRoles);
+        Assert.Equal(viewerRole.Id, createdUser.UserRoles.First().RoleId);
         await _repository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task RegisterAsync_DeveNormalizarEmail_ParaMinusculo()
+    public async Task RegisterAsync_ShouldNormalizeEmail_ToLowercase()
     {
         // Arrange
-        var request = new RegisterUserRequest("  USUARIO@TEST.COM  ", "Senha123!");
+        var request = new RegisterUserRequest("  USER@TEST.COM  ", "Password123!");
         var viewerRole = new Role { Id = Guid.NewGuid(), Name = "Viewer" };
 
         _repository.GetByEmailAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
@@ -101,16 +101,16 @@ public class AuthServiceTests
         _repository.GetRoleByNameAsync("Viewer", Arg.Any<CancellationToken>())
                    .Returns(viewerRole);
 
-        User? usuarioCriado = null;
+        User? createdUser = null;
         await _repository.AddUserAsync(
-            Arg.Do<User>(u => usuarioCriado = u),
+            Arg.Do<User>(u => createdUser = u),
             Arg.Any<CancellationToken>());
 
         // Act
         await _sut.RegisterAsync(request);
 
         // Assert
-        Assert.Equal("usuario@test.com", usuarioCriado!.Email);
+        Assert.Equal("user@test.com", createdUser!.Email);
     }
 
     // -------------------------------------------------------------------------
@@ -118,10 +118,10 @@ public class AuthServiceTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task LoginAsync_DeveRetornarUnauthorized_QuandoEmailNaoEncontrado()
+    public async Task LoginAsync_ShouldReturnUnauthorized_WhenEmailNotFound()
     {
         // Arrange
-        var request = new LoginUserRequest("naoexiste@test.com", "qualquer");
+        var request = new LoginUserRequest("notfound@test.com", "any");
         _repository.GetByEmailAsync(request.Email, Arg.Any<CancellationToken>())
                    .Returns((User?)null);
 
@@ -135,18 +135,18 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task LoginAsync_DeveRetornarUnauthorized_QuandoSenhaErrada()
+    public async Task LoginAsync_ShouldReturnUnauthorized_WhenPasswordIsWrong()
     {
         // Arrange
-        var senhaCorreta = "Senha123!";
+        var correctPassword = "Password123!";
         var user = new User
         {
             Id = Guid.NewGuid(),
             Email = "user@test.com",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(senhaCorreta)
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(correctPassword)
         };
 
-        var request = new LoginUserRequest(user.Email, "SenhaErrada!");
+        var request = new LoginUserRequest(user.Email, "WrongPassword!");
         _repository.GetByEmailAsync(request.Email, Arg.Any<CancellationToken>())
                    .Returns(user);
 
@@ -159,39 +159,39 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task LoginAsync_DeveRetornarTokens_QuandoCredenciaisValidas()
+    public async Task LoginAsync_ShouldReturnTokens_WhenCredentialsAreValid()
     {
         // Arrange
-        var senha = "Senha123!";
+        var password = "Password123!";
         var user = new User
         {
             Id = Guid.NewGuid(),
             Email = "user@test.com",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(senha),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
             UserRoles = []
         };
 
         var refreshToken = new RefreshToken
         {
             Id = Guid.NewGuid(),
-            Token = "refresh-token-gerado",
+            Token = "generated-refresh-token",
             UserId = user.Id,
             ExpiresAt = DateTime.UtcNow.AddDays(7)
         };
 
-        var request = new LoginUserRequest(user.Email, senha);
+        var request = new LoginUserRequest(user.Email, password);
         _repository.GetByEmailAsync(request.Email, Arg.Any<CancellationToken>())
                    .Returns(user);
         _tokenService.GenerateRefreshToken(user.Id).Returns(refreshToken);
-        _tokenService.GenerateAccessToken(user).Returns("access-token-gerado");
+        _tokenService.GenerateAccessToken(user).Returns("generated-access-token");
 
         // Act
         var result = await _sut.LoginAsync(request);
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Equal("access-token-gerado", result.Value!.AccessToken);
-        Assert.Equal("refresh-token-gerado", result.Value.RefreshToken);
+        Assert.Equal("generated-access-token", result.Value!.AccessToken);
+        Assert.Equal("generated-refresh-token", result.Value.RefreshToken);
         await _repository.Received(1).AddRefreshTokenAsync(refreshToken, Arg.Any<CancellationToken>());
         await _repository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
@@ -201,14 +201,14 @@ public class AuthServiceTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task RefreshAsync_DeveRetornarUnauthorized_QuandoTokenNaoEncontrado()
+    public async Task RefreshAsync_ShouldReturnUnauthorized_WhenTokenNotFound()
     {
         // Arrange
-        _repository.GetRefreshTokenAsync("token-invalido", Arg.Any<CancellationToken>())
+        _repository.GetRefreshTokenAsync("invalid-token", Arg.Any<CancellationToken>())
                    .Returns((RefreshToken?)null);
 
         // Act
-        var result = await _sut.RefreshAsync("token-invalido");
+        var result = await _sut.RefreshAsync("invalid-token");
 
         // Assert
         Assert.True(result.IsFailure);
@@ -216,22 +216,22 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task RefreshAsync_DeveRetornarUnauthorized_QuandoTokenRevogado()
+    public async Task RefreshAsync_ShouldReturnUnauthorized_WhenTokenIsRevoked()
     {
         // Arrange
         var storedToken = new RefreshToken
         {
-            Token = "token-revogado",
+            Token = "revoked-token",
             IsRevoked = true,
             ExpiresAt = DateTime.UtcNow.AddDays(7),
             User = new User { UserRoles = [] }
         };
 
-        _repository.GetRefreshTokenAsync("token-revogado", Arg.Any<CancellationToken>())
+        _repository.GetRefreshTokenAsync("revoked-token", Arg.Any<CancellationToken>())
                    .Returns(storedToken);
 
         // Act
-        var result = await _sut.RefreshAsync("token-revogado");
+        var result = await _sut.RefreshAsync("revoked-token");
 
         // Assert
         Assert.True(result.IsFailure);
@@ -239,22 +239,22 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task RefreshAsync_DeveRetornarUnauthorized_QuandoTokenExpirado()
+    public async Task RefreshAsync_ShouldReturnUnauthorized_WhenTokenIsExpired()
     {
         // Arrange
         var storedToken = new RefreshToken
         {
-            Token = "token-expirado",
+            Token = "expired-token",
             IsRevoked = false,
             ExpiresAt = DateTime.UtcNow.AddDays(-1), // expirado
             User = new User { UserRoles = [] }
         };
 
-        _repository.GetRefreshTokenAsync("token-expirado", Arg.Any<CancellationToken>())
+        _repository.GetRefreshTokenAsync("expired-token", Arg.Any<CancellationToken>())
                    .Returns(storedToken);
 
         // Act
-        var result = await _sut.RefreshAsync("token-expirado");
+        var result = await _sut.RefreshAsync("expired-token");
 
         // Assert
         Assert.True(result.IsFailure);
@@ -262,7 +262,7 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task RefreshAsync_DeveRotacionarToken_QuandoValido()
+    public async Task RefreshAsync_ShouldRotateToken_WhenTokenIsValid()
     {
         // Arrange
         var userId = Guid.NewGuid();
@@ -270,36 +270,36 @@ public class AuthServiceTests
 
         var storedToken = new RefreshToken
         {
-            Token = "token-valido",
+            Token = "valid-token",
             IsRevoked = false,
             ExpiresAt = DateTime.UtcNow.AddDays(7),
             UserId = userId,
             User = user
         };
 
-        var novoRefreshToken = new RefreshToken
+        var newRefreshToken = new RefreshToken
         {
-            Token = "novo-refresh-token",
+            Token = "new-refresh-token",
             UserId = userId,
             ExpiresAt = DateTime.UtcNow.AddDays(7)
         };
 
-        _repository.GetRefreshTokenAsync("token-valido", Arg.Any<CancellationToken>())
+        _repository.GetRefreshTokenAsync("valid-token", Arg.Any<CancellationToken>())
                    .Returns(storedToken);
-        _tokenService.GenerateRefreshToken(userId).Returns(novoRefreshToken);
-        _tokenService.GenerateAccessToken(user).Returns("novo-access-token");
+        _tokenService.GenerateRefreshToken(userId).Returns(newRefreshToken);
+        _tokenService.GenerateAccessToken(user).Returns("new-access-token");
 
         // Act
-        var result = await _sut.RefreshAsync("token-valido");
+        var result = await _sut.RefreshAsync("valid-token");
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Equal("novo-access-token", result.Value!.AccessToken);
-        Assert.Equal("novo-refresh-token", result.Value.RefreshToken);
+        Assert.Equal("new-access-token", result.Value!.AccessToken);
+        Assert.Equal("new-refresh-token", result.Value.RefreshToken);
 
         // Verifica rotação: token antigo revogado, novo adicionado
         await _repository.Received(1).RevokeRefreshTokenAsync(storedToken, Arg.Any<CancellationToken>());
-        await _repository.Received(1).AddRefreshTokenAsync(novoRefreshToken, Arg.Any<CancellationToken>());
+        await _repository.Received(1).AddRefreshTokenAsync(newRefreshToken, Arg.Any<CancellationToken>());
         await _repository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -308,14 +308,14 @@ public class AuthServiceTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task LogoutAsync_DeveRetornarUnauthorized_QuandoTokenNaoEncontrado()
+    public async Task LogoutAsync_ShouldReturnUnauthorized_WhenTokenNotFound()
     {
         // Arrange
-        _repository.GetRefreshTokenAsync("token-invalido", Arg.Any<CancellationToken>())
+        _repository.GetRefreshTokenAsync("invalid-token", Arg.Any<CancellationToken>())
                    .Returns((RefreshToken?)null);
 
         // Act
-        var result = await _sut.LogoutAsync("token-invalido");
+        var result = await _sut.LogoutAsync("invalid-token");
 
         // Assert
         Assert.True(result.IsFailure);
@@ -323,7 +323,7 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task LogoutAsync_DeveRetornarUnauthorized_QuandoTokenJaRevogado()
+    public async Task LogoutAsync_ShouldReturnUnauthorized_WhenTokenAlreadyRevoked()
     {
         // Arrange
         var storedToken = new RefreshToken { Token = "token", IsRevoked = true };
@@ -339,15 +339,15 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task LogoutAsync_DeveRevogarToken_QuandoValido()
+    public async Task LogoutAsync_ShouldRevokeToken_WhenTokenIsValid()
     {
         // Arrange
-        var storedToken = new RefreshToken { Token = "token-ativo", IsRevoked = false };
-        _repository.GetRefreshTokenAsync("token-ativo", Arg.Any<CancellationToken>())
+        var storedToken = new RefreshToken { Token = "active-token", IsRevoked = false };
+        _repository.GetRefreshTokenAsync("active-token", Arg.Any<CancellationToken>())
                    .Returns(storedToken);
 
         // Act
-        var result = await _sut.LogoutAsync("token-ativo");
+        var result = await _sut.LogoutAsync("active-token");
 
         // Assert
         Assert.True(result.IsSuccess);
@@ -360,7 +360,7 @@ public class AuthServiceTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task UpdateUserRolesAsync_DeveRetornarNotFound_QuandoUsuarioNaoExiste()
+    public async Task UpdateUserRolesAsync_ShouldReturnNotFound_WhenUserDoesNotExist()
     {
         // Arrange
         var userId = Guid.NewGuid();
@@ -377,7 +377,7 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task UpdateUserRolesAsync_DeveRetornarValidation_QuandoListaDeRolesVazia()
+    public async Task UpdateUserRolesAsync_ShouldReturnValidation_WhenRolesListIsEmpty()
     {
         // Arrange
         var userId = Guid.NewGuid();
@@ -395,7 +395,7 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task UpdateUserRolesAsync_DeveRetornarValidation_QuandoRoleNaoExisteNoBanco()
+    public async Task UpdateUserRolesAsync_ShouldReturnValidation_WhenRoleDoesNotExistInDatabase()
     {
         // Arrange
         var userId = Guid.NewGuid();
@@ -404,7 +404,7 @@ public class AuthServiceTests
 
         _repository.GetByIdWithRolesAsync(userId, Arg.Any<CancellationToken>())
                    .Returns(user);
-        // Retorna lista vazia — role não encontrada
+        // Retorna lista vazia — role não encontrada no banco
         _repository.GetRolesByNamesAsync(Arg.Any<List<string>>(), Arg.Any<CancellationToken>())
                    .Returns([]);
 
@@ -417,7 +417,7 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task UpdateUserRolesAsync_DeveAtualizarRoles_QuandoDadosValidos()
+    public async Task UpdateUserRolesAsync_ShouldUpdateRoles_WhenDataIsValid()
     {
         // Arrange
         var userId = Guid.NewGuid();

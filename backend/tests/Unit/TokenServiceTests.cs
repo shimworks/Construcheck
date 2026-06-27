@@ -9,9 +9,8 @@ namespace Construcheck.Unit.Tests.Auth.Services;
 public class TokenServiceTests
 {
     private readonly TokenService _sut;
-    private readonly IConfiguration _configuration;
 
-    private const string Secret = "construcheck-super-secret-key-para-testes-com-256-bits!!";
+    private const string Secret = "construcheck-super-secret-key-for-tests-with-256-bits!!";
     private const string Issuer = "construcheck-test";
     private const string Audience = "construcheck-test";
     private const string ExpirationMinutes = "15";
@@ -19,7 +18,7 @@ public class TokenServiceTests
 
     public TokenServiceTests()
     {
-        _configuration = new ConfigurationBuilder()
+        var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["JWT_SECRET"] = Secret,
@@ -30,7 +29,7 @@ public class TokenServiceTests
             })
             .Build();
 
-        _sut = new TokenService(_configuration);
+        _sut = new TokenService(configuration);
     }
 
     // -------------------------------------------------------------------------
@@ -38,10 +37,10 @@ public class TokenServiceTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public void GenerateAccessToken_DeveRetornarTokenValido()
+    public void GenerateAccessToken_ShouldReturnValidToken()
     {
         // Arrange
-        var user = CriarUsuarioComRole("Viewer");
+        var user = BuildUserWithRole("Viewer");
 
         // Act
         var token = _sut.GenerateAccessToken(user);
@@ -55,14 +54,14 @@ public class TokenServiceTests
     }
 
     [Fact]
-    public void GenerateAccessToken_DeveConterSubComIdDoUsuario()
+    public void GenerateAccessToken_ShouldContainSubClaimWithUserId()
     {
         // Arrange
-        var user = CriarUsuarioComRole("Viewer");
+        var user = BuildUserWithRole("Viewer");
 
         // Act
         var token = _sut.GenerateAccessToken(user);
-        var jwt = LerToken(token);
+        var jwt = ReadToken(token);
 
         // Assert
         var sub = jwt.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub);
@@ -71,14 +70,14 @@ public class TokenServiceTests
     }
 
     [Fact]
-    public void GenerateAccessToken_DeveConterEmailDoUsuario()
+    public void GenerateAccessToken_ShouldContainUserEmail()
     {
         // Arrange
-        var user = CriarUsuarioComRole("Viewer");
+        var user = BuildUserWithRole("Viewer");
 
         // Act
         var token = _sut.GenerateAccessToken(user);
-        var jwt = LerToken(token);
+        var jwt = ReadToken(token);
 
         // Assert
         var email = jwt.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Email);
@@ -87,14 +86,14 @@ public class TokenServiceTests
     }
 
     [Fact]
-    public void GenerateAccessToken_DeveConterRolesComoClaimsDoUsuario()
+    public void GenerateAccessToken_ShouldContainRolesAsClaims()
     {
         // Arrange
-        var user = CriarUsuarioComDuasRoles("Admin", "Viewer");
+        var user = BuildUserWithTwoRoles("Admin", "Viewer");
 
         // Act
         var token = _sut.GenerateAccessToken(user);
-        var jwt = LerToken(token);
+        var jwt = ReadToken(token);
 
         // Assert
         var roles = jwt.Claims
@@ -107,14 +106,14 @@ public class TokenServiceTests
     }
 
     [Fact]
-    public void GenerateAccessToken_DeveUsarIssuerEAudienceConfigurados()
+    public void GenerateAccessToken_ShouldUseConfiguredIssuerAndAudience()
     {
         // Arrange
-        var user = CriarUsuarioComRole("Viewer");
+        var user = BuildUserWithRole("Viewer");
 
         // Act
         var token = _sut.GenerateAccessToken(user);
-        var jwt = LerToken(token);
+        var jwt = ReadToken(token);
 
         // Assert
         Assert.Equal(Issuer, jwt.Issuer);
@@ -122,33 +121,34 @@ public class TokenServiceTests
     }
 
     [Fact]
-    public void GenerateAccessToken_DeveExpirarNoTempoConfigurado()
+    public void GenerateAccessToken_ShouldExpireAtConfiguredTime()
     {
         // Arrange
-        var user = CriarUsuarioComRole("Viewer");
-        var antes = DateTime.UtcNow.AddMinutes(int.Parse(ExpirationMinutes) - 1);
-        var depois = DateTime.UtcNow.AddMinutes(int.Parse(ExpirationMinutes) + 1);
+        var user = BuildUserWithRole("Viewer");
+        var minutes = int.Parse(ExpirationMinutes);
+        var lowerBound = DateTime.UtcNow.AddMinutes(minutes - 1);
+        var upperBound = DateTime.UtcNow.AddMinutes(minutes + 1);
 
         // Act
         var token = _sut.GenerateAccessToken(user);
-        var jwt = LerToken(token);
+        var jwt = ReadToken(token);
 
         // Assert
-        Assert.True(jwt.ValidTo > antes);
-        Assert.True(jwt.ValidTo < depois);
+        Assert.True(jwt.ValidTo > lowerBound);
+        Assert.True(jwt.ValidTo < upperBound);
     }
 
     [Fact]
-    public void GenerateAccessToken_DeveConterJtiUnico()
+    public void GenerateAccessToken_ShouldContainUniqueJti()
     {
         // Arrange
-        var user = CriarUsuarioComRole("Viewer");
+        var user = BuildUserWithRole("Viewer");
 
         // Act
         var token1 = _sut.GenerateAccessToken(user);
         var token2 = _sut.GenerateAccessToken(user);
-        var jti1 = LerToken(token1).Claims.First(c => c.Type == JwtRegisteredClaimNames.Jti).Value;
-        var jti2 = LerToken(token2).Claims.First(c => c.Type == JwtRegisteredClaimNames.Jti).Value;
+        var jti1 = ReadToken(token1).Claims.First(c => c.Type == JwtRegisteredClaimNames.Jti).Value;
+        var jti2 = ReadToken(token2).Claims.First(c => c.Type == JwtRegisteredClaimNames.Jti).Value;
 
         // Assert
         Assert.NotEqual(jti1, jti2);
@@ -159,7 +159,7 @@ public class TokenServiceTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public void GenerateRefreshToken_DeveRetornarTokenComUserId()
+    public void GenerateRefreshToken_ShouldContainCorrectUserId()
     {
         // Arrange
         var userId = Guid.NewGuid();
@@ -172,7 +172,7 @@ public class TokenServiceTests
     }
 
     [Fact]
-    public void GenerateRefreshToken_DeveRetornarTokenNaoRevogado()
+    public void GenerateRefreshToken_ShouldNotBeRevoked()
     {
         // Act
         var token = _sut.GenerateRefreshToken(Guid.NewGuid());
@@ -182,22 +182,22 @@ public class TokenServiceTests
     }
 
     [Fact]
-    public void GenerateRefreshToken_DeveExpirarNoDiaConfigurado()
+    public void GenerateRefreshToken_ShouldExpireAtConfiguredDay()
     {
         // Arrange
-        var dias = int.Parse(RefreshExpirationDays);
-        var esperado = DateTime.UtcNow.AddDays(dias);
+        var days = int.Parse(RefreshExpirationDays);
+        var expected = DateTime.UtcNow.AddDays(days);
 
         // Act
         var token = _sut.GenerateRefreshToken(Guid.NewGuid());
 
         // Assert — tolerância de 5 segundos para variação de clock
-        Assert.True(token.ExpiresAt > esperado.AddSeconds(-5));
-        Assert.True(token.ExpiresAt < esperado.AddSeconds(5));
+        Assert.True(token.ExpiresAt > expected.AddSeconds(-5));
+        Assert.True(token.ExpiresAt < expected.AddSeconds(5));
     }
 
     [Fact]
-    public void GenerateRefreshToken_DeveGerarTokensUnicos()
+    public void GenerateRefreshToken_ShouldGenerateUniqueTokens()
     {
         // Arrange
         var userId = Guid.NewGuid();
@@ -211,12 +211,12 @@ public class TokenServiceTests
     }
 
     [Fact]
-    public void GenerateRefreshToken_DeveGerarTokenBase64Valido()
+    public void GenerateRefreshToken_ShouldGenerateValidBase64Token()
     {
         // Act
         var token = _sut.GenerateRefreshToken(Guid.NewGuid());
 
-        // Assert — token é base64 válido e tem comprimento esperado (64 bytes → 88 chars base64)
+        // Assert — token é base64 válido com 64 bytes (88 chars base64)
         var bytes = Convert.FromBase64String(token.Token);
         Assert.Equal(64, bytes.Length);
     }
@@ -225,20 +225,17 @@ public class TokenServiceTests
     // Helpers
     // -------------------------------------------------------------------------
 
-    private static User CriarUsuarioComRole(string roleName) => new()
+    private static User BuildUserWithRole(string roleName) => new()
     {
         Id = Guid.NewGuid(),
         Email = "user@test.com",
         UserRoles =
         [
-            new UserRole
-            {
-                Role = new Role { Name = roleName }
-            }
+            new UserRole { Role = new Role { Name = roleName } }
         ]
     };
 
-    private static User CriarUsuarioComDuasRoles(string role1, string role2) => new()
+    private static User BuildUserWithTwoRoles(string role1, string role2) => new()
     {
         Id = Guid.NewGuid(),
         Email = "user@test.com",
@@ -249,9 +246,6 @@ public class TokenServiceTests
         ]
     };
 
-    private static JwtSecurityToken LerToken(string token)
-    {
-        var handler = new JwtSecurityTokenHandler();
-        return handler.ReadJwtToken(token);
-    }
+    private static JwtSecurityToken ReadToken(string token) =>
+        new JwtSecurityTokenHandler().ReadJwtToken(token);
 }

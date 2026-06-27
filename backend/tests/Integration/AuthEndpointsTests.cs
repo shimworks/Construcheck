@@ -1,10 +1,12 @@
-using System.Net;
-using System.Net.Http.Json;
-using System.Text.Json;
 using Construcheck.API.Data;
 using Construcheck.API.Modules.Auth.Entities;
 using Construcheck.Integration.Tests.Infrastructure;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace Construcheck.Integration.Tests.Auth;
 
@@ -18,10 +20,10 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task Register_DeveRetornar201_QuandoDadosValidos()
+    public async Task Register_ShouldReturn201_WhenDataIsValid()
     {
         // Arrange
-        var request = new { email = $"novo-{Guid.NewGuid()}@test.com", password = "Senha123!" };
+        var request = new { email = $"new-{Guid.NewGuid()}@test.com", password = "Password123!" };
 
         // Act
         var response = await _client.PostAsJsonAsync("/api/auth/register", request);
@@ -31,11 +33,11 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task Register_DeveRetornar409_QuandoEmailJaCadastrado()
+    public async Task Register_ShouldReturn409_WhenEmailAlreadyExists()
     {
         // Arrange — registra o usuário primeiro
-        var email = $"duplicado-{Guid.NewGuid()}@test.com";
-        var request = new { email, password = "Senha123!" };
+        var email = $"duplicate-{Guid.NewGuid()}@test.com";
+        var request = new { email, password = "Password123!" };
         await _client.PostAsJsonAsync("/api/auth/register", request);
 
         // Act — tenta registrar novamente com o mesmo e-mail
@@ -46,10 +48,10 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task Register_NaoDeveRetornarToken_NaResposta()
+    public async Task Register_ShouldNotReturnToken_InResponseBody()
     {
         // Arrange
-        var request = new { email = $"sem-token-{Guid.NewGuid()}@test.com", password = "Senha123!" };
+        var request = new { email = $"no-token-{Guid.NewGuid()}@test.com", password = "Password123!" };
 
         // Act
         var response = await _client.PostAsJsonAsync("/api/auth/register", request);
@@ -61,17 +63,17 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task Register_DeveCriarUsuarioComRoleViewer_NoBanco()
+    public async Task Register_ShouldCreateUserWithViewerRole_InDatabase()
     {
         // Arrange
         var email = $"viewer-{Guid.NewGuid()}@test.com";
-        var request = new { email, password = "Senha123!" };
+        var request = new { email, password = "Password123!" };
 
         // Act
         await _client.PostAsJsonAsync("/api/auth/register", request);
 
         // Assert — verifica diretamente no banco
-        using var db = factory.CriarDbContext();
+        using var db = factory.CreateDbContext();
         var user = db.Users
             .Where(u => u.Email == email)
             .Select(u => new
@@ -91,17 +93,17 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task Login_DeveRetornar200ComAccessToken_QuandoCredenciaisValidas()
+    public async Task Login_ShouldReturn200WithAccessToken_WhenCredentialsAreValid()
     {
         // Arrange
         var email = $"login-{Guid.NewGuid()}@test.com";
-        await RegistrarUsuario(email, "Senha123!");
+        await RegisterUser(email, "Password123!");
 
         // Act
         var response = await _client.PostAsJsonAsync("/api/auth/login",
-            new { email, password = "Senha123!" });
+            new { email, password = "Password123!" });
 
-        var body = await LerJson(response);
+        var body = await ReadJson(response);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -110,15 +112,15 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task Login_DeveDefinirCookieHttpOnly_QuandoCredenciaisValidas()
+    public async Task Login_ShouldSetHttpOnlyCookie_WhenCredentialsAreValid()
     {
         // Arrange
         var email = $"cookie-{Guid.NewGuid()}@test.com";
-        await RegistrarUsuario(email, "Senha123!");
+        await RegisterUser(email, "Password123!");
 
         // Act
         var response = await _client.PostAsJsonAsync("/api/auth/login",
-            new { email, password = "Senha123!" });
+            new { email, password = "Password123!" });
 
         // Assert
         var setCookie = response.Headers
@@ -132,26 +134,26 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task Login_DeveRetornar401_QuandoEmailNaoExiste()
+    public async Task Login_ShouldReturn401_WhenEmailDoesNotExist()
     {
         // Act
         var response = await _client.PostAsJsonAsync("/api/auth/login",
-            new { email = "naoexiste@test.com", password = "qualquer" });
+            new { email = "notfound@test.com", password = "any" });
 
         // Assert
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
-    public async Task Login_DeveRetornar401_QuandoSenhaErrada()
+    public async Task Login_ShouldReturn401_WhenPasswordIsWrong()
     {
         // Arrange
-        var email = $"senha-errada-{Guid.NewGuid()}@test.com";
-        await RegistrarUsuario(email, "SenhaCorreta123!");
+        var email = $"wrong-pass-{Guid.NewGuid()}@test.com";
+        await RegisterUser(email, "CorrectPassword123!");
 
         // Act
         var response = await _client.PostAsJsonAsync("/api/auth/login",
-            new { email, password = "SenhaErrada!" });
+            new { email, password = "WrongPassword!" });
 
         // Assert
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -162,33 +164,38 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task Refresh_DeveRetornar200ComNovoAccessToken_QuandoCookieValido()
+    public async Task Refresh_ShouldReturn200WithNewAccessToken_WhenCookieIsValid()
     {
-        // Arrange — login para obter o cookie
+        // Arrange
         var email = $"refresh-{Guid.NewGuid()}@test.com";
-        await RegistrarUsuario(email, "Senha123!");
+        await RegisterUser(email, "Password123!");
 
-        var clientComCookies = factory.CreateClient(
-            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
-            {
-                HandleCookies = true
-            });
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login",
+            new { email, password = "Password123!" });
 
-        await clientComCookies.PostAsJsonAsync("/api/auth/login",
-            new { email, password = "Senha123!" });
+        // Extrai o cookie da resposta do login manualmente
+        var setCookieHeader = loginResponse.Headers
+            .FirstOrDefault(h => h.Key.Equals("Set-Cookie", StringComparison.OrdinalIgnoreCase))
+            .Value?.First();
+
+        Assert.NotNull(setCookieHeader);
+        var cookieValue = setCookieHeader.Split(';')[0]; // "refreshToken=xyz"
 
         // Act
-        var response = await clientComCookies.PostAsync("/api/auth/refresh", null);
-        var body = await LerJson(response);
+        var refreshRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
+        refreshRequest.Headers.Add("Cookie", cookieValue);
+        var response = await _client.SendAsync(refreshRequest);
+
+        var body = await ReadJson(response);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.True(body.TryGetProperty("accessToken", out var novoToken));
-        Assert.NotEmpty(novoToken.GetString()!);
+        Assert.True(body.TryGetProperty("accessToken", out var newToken));
+        Assert.NotEmpty(newToken.GetString()!);
     }
 
     [Fact]
-    public async Task Refresh_DeveRetornar401_QuandoSemCookie()
+    public async Task Refresh_ShouldReturn401_WhenNoCookieIsPresent()
     {
         // Act
         var response = await _client.PostAsync("/api/auth/refresh", null);
@@ -198,30 +205,30 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task Refresh_DeveRotacionarToken_NaoBancoAposUso()
+    public async Task Refresh_ShouldRotateToken_InDatabaseAfterUse()
     {
         // Arrange
-        var email = $"rotacao-{Guid.NewGuid()}@test.com";
-        await RegistrarUsuario(email, "Senha123!");
+        var email = $"rotation-{Guid.NewGuid()}@test.com";
+        await RegisterUser(email, "Password123!");
 
-        var clientComCookies = factory.CreateClient(
+        var clientWithCookies = factory.CreateClient(
             new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
             {
                 HandleCookies = true
             });
 
-        await clientComCookies.PostAsJsonAsync("/api/auth/login",
-            new { email, password = "Senha123!" });
+        await clientWithCookies.PostAsJsonAsync("/api/auth/login",
+            new { email, password = "Password123!" });
 
         // Act — primeiro refresh
-        await clientComCookies.PostAsync("/api/auth/refresh", null);
+        await clientWithCookies.PostAsync("/api/auth/refresh", null);
 
-        // Assert — verifica no banco que o token original está revogado
-        using var db = factory.CriarDbContext();
+        // Assert — verifica no banco que o token original está revogado e o novo está ativo
+        using var db = factory.CreateDbContext();
         var user = db.Users.First(u => u.Email == email);
         var tokens = db.RefreshTokens.Where(t => t.UserId == user.Id).ToList();
 
-        Assert.True(tokens.Count >= 2); // original + novo
+        Assert.True(tokens.Count >= 2);
         Assert.Contains(tokens, t => t.IsRevoked);
         Assert.Contains(tokens, t => !t.IsRevoked);
     }
@@ -231,30 +238,30 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task Logout_DeveRetornar204_QuandoAutenticado()
+    public async Task Logout_ShouldReturn204_WhenAuthenticated()
     {
         // Arrange
         var email = $"logout-{Guid.NewGuid()}@test.com";
-        await RegistrarUsuario(email, "Senha123!");
+        await RegisterUser(email, "Password123!");
 
-        var clientComCookies = factory.CreateClient(
+        var clientWithCookies = factory.CreateClient(
             new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
             {
                 HandleCookies = true
             });
 
-        await clientComCookies.PostAsJsonAsync("/api/auth/login",
-            new { email, password = "Senha123!" });
+        await clientWithCookies.PostAsJsonAsync("/api/auth/login",
+            new { email, password = "Password123!" });
 
         // Act
-        var response = await clientComCookies.PostAsync("/api/auth/logout", null);
+        var response = await clientWithCookies.PostAsync("/api/auth/logout", null);
 
         // Assert
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 
     [Fact]
-    public async Task Logout_DeveRetornar204_QuandoSemCookie()
+    public async Task Logout_ShouldReturn204_WhenNoCookieIsPresent()
     {
         // Logout sem cookie também retorna 204 — cliente já está "fora"
         var response = await _client.PostAsync("/api/auth/logout", null);
@@ -263,52 +270,62 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task Logout_DeveRevogarToken_NoBanco()
+    public async Task Logout_ShouldRevokeToken_InDatabase()
     {
         // Arrange
-        var email = $"logout-banco-{Guid.NewGuid()}@test.com";
-        await RegistrarUsuario(email, "Senha123!");
+        var email = $"logout-db-{Guid.NewGuid()}@test.com";
+        await RegisterUser(email, "Password123!");
 
-        var clientComCookies = factory.CreateClient(
-            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
-            {
-                HandleCookies = true
-            });
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login",
+            new { email, password = "Password123!" });
 
-        await clientComCookies.PostAsJsonAsync("/api/auth/login",
-            new { email, password = "Senha123!" });
+        // Extrai o cookie da resposta do login manualmente
+        var setCookieHeader = loginResponse.Headers
+            .FirstOrDefault(h => h.Key.Equals("Set-Cookie", StringComparison.OrdinalIgnoreCase))
+            .Value?.First();
 
-        // Act
-        await clientComCookies.PostAsync("/api/auth/logout", null);
+        Assert.NotNull(setCookieHeader);
+
+        // Extrai apenas o valor do cookie (antes do primeiro ;)
+        var cookieValue = setCookieHeader.Split(';')[0]; // "refreshToken=xyz"
+
+        // Act — envia o cookie manualmente no header
+        var logoutRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/logout");
+        logoutRequest.Headers.Add("Cookie", cookieValue);
+        var logoutResponse = await _client.SendAsync(logoutRequest);
+
+        Assert.Equal(HttpStatusCode.NoContent, logoutResponse.StatusCode);
 
         // Assert
-        using var db = factory.CriarDbContext();
+        using var db = factory.CreateDbContext();
         var user = db.Users.First(u => u.Email == email);
-        var tokens = db.RefreshTokens.Where(t => t.UserId == user.Id).ToList();
+        var token = db.RefreshTokens
+            .AsNoTracking()
+            .First(t => t.UserId == user.Id);
 
-        Assert.All(tokens, t => Assert.True(t.IsRevoked));
+        Assert.True(token.IsRevoked);
     }
 
     [Fact]
-    public async Task Logout_DeveFazerRefreshFalhar_AposRevogacao()
+    public async Task Logout_ShouldMakeRefreshFail_AfterRevocation()
     {
         // Arrange
         var email = $"logout-refresh-{Guid.NewGuid()}@test.com";
-        await RegistrarUsuario(email, "Senha123!");
+        await RegisterUser(email, "Password123!");
 
-        var clientComCookies = factory.CreateClient(
+        var clientWithCookies = factory.CreateClient(
             new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
             {
                 HandleCookies = true
             });
 
-        await clientComCookies.PostAsJsonAsync("/api/auth/login",
-            new { email, password = "Senha123!" });
+        await clientWithCookies.PostAsJsonAsync("/api/auth/login",
+            new { email, password = "Password123!" });
 
-        await clientComCookies.PostAsync("/api/auth/logout", null);
+        await clientWithCookies.PostAsync("/api/auth/logout", null);
 
         // Act — tenta refresh após logout
-        var response = await clientComCookies.PostAsync("/api/auth/refresh", null);
+        var response = await clientWithCookies.PostAsync("/api/auth/refresh", null);
 
         // Assert
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -319,7 +336,7 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task UpdateRoles_DeveRetornar401_QuandoSemToken()
+    public async Task UpdateRoles_ShouldReturn401_WhenNoTokenProvided()
     {
         // Act
         var response = await _client.PutAsJsonAsync(
@@ -331,12 +348,12 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task UpdateRoles_DeveRetornar403_QuandoTokenDeViewer()
+    public async Task UpdateRoles_ShouldReturn403_WhenCalledByViewer()
     {
         // Arrange — registra usuário Viewer e faz login
         var email = $"viewer-roles-{Guid.NewGuid()}@test.com";
-        await RegistrarUsuario(email, "Senha123!");
-        var accessToken = await ObterAccessToken(email, "Senha123!");
+        await RegisterUser(email, "Password123!");
+        var accessToken = await GetAccessToken(email, "Password123!");
 
         // Act
         var request = new HttpRequestMessage(HttpMethod.Put,
@@ -354,10 +371,10 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task UpdateRoles_DeveRetornar404_QuandoUsuarioNaoExiste()
+    public async Task UpdateRoles_ShouldReturn404_WhenUserDoesNotExist()
     {
         // Arrange — cria um Admin direto no banco e faz login
-        var adminToken = await CriarAdminEObterToken();
+        var adminToken = await CreateAdminAndGetToken();
 
         // Act
         var request = new HttpRequestMessage(HttpMethod.Put,
@@ -375,20 +392,20 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task UpdateRoles_DeveRetornar200_QuandoAdminAtualizaRoleDeOutroUsuario()
+    public async Task UpdateRoles_ShouldReturn200_WhenAdminUpdatesAnotherUsersRoles()
     {
         // Arrange
-        var adminToken = await CriarAdminEObterToken();
+        var adminToken = await CreateAdminAndGetToken();
 
-        var emailAlvo = $"alvo-{Guid.NewGuid()}@test.com";
-        await RegistrarUsuario(emailAlvo, "Senha123!");
+        var targetEmail = $"target-{Guid.NewGuid()}@test.com";
+        await RegisterUser(targetEmail, "Password123!");
 
-        using var db = factory.CriarDbContext();
-        var userIdAlvo = db.Users.First(u => u.Email == emailAlvo).Id;
+        using var db = factory.CreateDbContext();
+        var targetUserId = db.Users.First(u => u.Email == targetEmail).Id;
 
         // Act
         var request = new HttpRequestMessage(HttpMethod.Put,
-            $"/api/auth/users/{userIdAlvo}/roles")
+            $"/api/auth/users/{targetUserId}/roles")
         {
             Content = JsonContent.Create(new { roles = new[] { "Admin" } })
         };
@@ -400,52 +417,49 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        using var db2 = factory.CriarDbContext();
-        var rolesAtuais = db2.UserRoles
-            .Where(ur => ur.UserId == userIdAlvo)
+        using var db2 = factory.CreateDbContext();
+        var currentRoles = db2.UserRoles
+            .Where(ur => ur.UserId == targetUserId)
             .Select(ur => ur.Role.Name)
             .ToList();
 
-        Assert.Contains("Admin", rolesAtuais);
+        Assert.Contains("Admin", currentRoles);
     }
 
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
-    private async Task RegistrarUsuario(string email, string password)
-    {
+    private async Task RegisterUser(string email, string password) =>
         await _client.PostAsJsonAsync("/api/auth/register", new { email, password });
-    }
 
-    private async Task<string> ObterAccessToken(string email, string password)
+    private async Task<string> GetAccessToken(string email, string password)
     {
         var response = await _client.PostAsJsonAsync("/api/auth/login", new { email, password });
-        var body = await LerJson(response);
+        var body = await ReadJson(response);
         return body.GetProperty("accessToken").GetString()!;
     }
 
-    private async Task<string> CriarAdminEObterToken()
+    private async Task<string> CreateAdminAndGetToken()
     {
         var email = $"admin-{Guid.NewGuid()}@test.com";
-        var password = "Admin123!";
+        const string password = "Admin123!";
 
-        await RegistrarUsuario(email, password);
+        await RegisterUser(email, password);
 
         // Promove para Admin diretamente no banco
-        using var db = factory.CriarDbContext();
+        using var db = factory.CreateDbContext();
         var user = db.Users.First(u => u.Email == email);
         var adminRole = db.Roles.First(r => r.Name == "Admin");
-        var viewerRole = db.Roles.First(r => r.Name == "Viewer");
 
         db.UserRoles.RemoveRange(db.UserRoles.Where(ur => ur.UserId == user.Id));
         db.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = adminRole.Id });
         await db.SaveChangesAsync();
 
-        return await ObterAccessToken(email, password);
+        return await GetAccessToken(email, password);
     }
 
-    private static async Task<JsonElement> LerJson(HttpResponseMessage response)
+    private static async Task<JsonElement> ReadJson(HttpResponseMessage response)
     {
         var content = await response.Content.ReadAsStringAsync();
         return JsonSerializer.Deserialize<JsonElement>(content);

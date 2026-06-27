@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 
 namespace Construcheck.Integration.Tests.Infrastructure;
 
@@ -15,31 +16,45 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
     private readonly string _dbName = $"construcheck-test-{Guid.NewGuid()}";
 
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        builder.UseSerilog((context, services, configuration) =>
+            configuration
+                .MinimumLevel.Warning()
+                .WriteTo.Console());
+
+        var host = base.CreateHost(builder);
+
+        // InMemory não precisa de EnsureCreated — o banco é criado automaticamente no primeiro uso
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        SeedRoles(db);
+
+        return host;
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseEnvironment("Testing");
+
         builder.ConfigureServices(services =>
         {
-            // Remove o AppDbContext registrado pela aplicação (SQL Server)
-            var descriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(DbContextOptions<AppDbContext>));
+            // Remove tudo relacionado ao EF Core
+            var descriptorsToRemove = services
+                .Where(d =>
+                    d.ServiceType.Namespace != null &&
+                    d.ServiceType.Namespace.StartsWith("Microsoft.EntityFrameworkCore"))
+                .ToList();
 
-            if (descriptor is not null)
+            foreach (var descriptor in descriptorsToRemove)
                 services.Remove(descriptor);
 
-            // Registra o AppDbContext com InMemory
+            // Registra com InMemory
             services.AddDbContext<AppDbContext>(options =>
                 options.UseInMemoryDatabase(_dbName));
-
-            // Garante que o banco foi criado e faz seed das roles
-            var sp = services.BuildServiceProvider();
-            using var scope = sp.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.Database.EnsureCreated();
-            SeedRoles(db);
         });
 
-        // Variáveis de ambiente necessárias para JWT e refresh token
-        builder.UseSetting("JWT_SECRET", "construcheck-super-secret-key-para-testes-com-256-bits!!");
+        builder.UseSetting("JWT_SECRET", "construcheck-super-secret-key-for-tests-with-256-bits!!");
         builder.UseSetting("JWT_ISSUER", "construcheck-test");
         builder.UseSetting("JWT_AUDIENCE", "construcheck-test");
         builder.UseSetting("JWT_EXPIRATION_MINUTES", "15");
@@ -71,7 +86,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     /// Cria um escopo para manipular o banco de dados diretamente nos testes.
     /// Útil para preparar dados (Arrange) e verificar estado após chamadas (Assert).
     /// </summary>
-    public AppDbContext CriarDbContext()
+    public AppDbContext CreateDbContext()
     {
         var scope = Services.CreateScope();
         return scope.ServiceProvider.GetRequiredService<AppDbContext>();

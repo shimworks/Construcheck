@@ -22,8 +22,8 @@ Log.Logger = new LoggerConfiguration()
         retainedFileCountLimit: 7)
     .CreateBootstrapLogger();
 
-try
-{
+//try
+//{
     Log.Information("Iniciando Construcheck API");
 
     var builder = WebApplication.CreateBuilder(args);
@@ -152,24 +152,27 @@ try
     });
 
     // Aplica migrations com retry — tolera banco momentaneamente indisponível no startup
-    using (var scope = app.Services.CreateScope())
+    if (!app.Environment.IsEnvironment("Testing"))
     {
-        var maxRetries = 5;
-        var delay = TimeSpan.FromSeconds(5);
-
-        for (int i = 0; i < maxRetries; i++)
+        using (var scope = app.Services.CreateScope())
         {
-            try
+            var maxRetries = 5;
+            var delay = TimeSpan.FromSeconds(5);
+
+            for (int i = 0; i < maxRetries; i++)
             {
-                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                db.Database.Migrate();
-                break;
-            }
-            catch (Exception ex)
-            {
-                if (i == maxRetries - 1) throw;
-                Log.Warning(ex, "Banco indisponível. Tentativa {Attempt} de {Max}. Aguardando...", i + 1, maxRetries);
-                await Task.Delay(delay);
+                try
+                {
+                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    db.Database.Migrate();
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    if (i == maxRetries - 1) throw;
+                    Log.Warning(ex, "Banco indisponível. Tentativa {Attempt} de {Max}. Aguardando...", i + 1, maxRetries);
+                    await Task.Delay(delay);
+                }
             }
         }
     }
@@ -187,12 +190,13 @@ try
     app.MapControllers();
 
     app.Run();
-}
-catch (Exception ex)
-{
-    Log.Fatal(ex, "Aplicação encerrou inesperadamente durante o boot");
-}
-finally
-{
-    await Log.CloseAndFlushAsync();
-}
+//}
+//catch (Exception ex)
+//{
+//    Log.Fatal(ex, "Aplicação encerrou inesperadamente durante o boot");
+//}
+//finally
+//{
+//    await Log.CloseAndFlushAsync();
+//}
+    public partial class Program { }
