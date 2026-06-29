@@ -1,0 +1,63 @@
+<div class="w-full max-w-md overflow-hidden rounded-lg bg-surface shadow-lg">
+  <div class="bg-card-header px-6 py-2">
+    <p class="text-xs font-medium text-gray-700">Criar Conta</p>
+  </div>
+
+  <div class="px-6 py-6 sm:px-8">
+    <h1 class="mb-2 text-2xl font-bold text-gray-900">Cadastro</h1>
+    <p class="mb-6 text-sm text-gray-600">
+      Preencha os dados abaixo para criar sua conta no Construcheck.
+    </p>
+
+    @if (errorMessage(); as message) {
+      <div class="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+        {{ message }}
+      </div>
+    }
+
+    @if (successMessage(); as message) {
+      <div class="mb-4 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700" role="alert">
+        {{ message }}
+      </div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <app-form-field
+        label="Email:"
+        inputId="register-email"
+        type="email"
+        placeholder="name@email.com"
+        [control]="form.controls.email"
+      />
+
+      <app-password-field
+        inputId="register-password"
+        [control]="form.controls.password"
+      />
+
+      <app-password-field
+        label="Confirmar senha:"
+        inputId="register-confirm-password"
+        placeholder="Repita a senha"
+        [control]="form.controls.confirmPassword"
+      />
+
+      <button
+        type="submit"
+        [disabled]="isSubmitting()"
+        class="mt-2 w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        @if (isSubmitting()) {
+          Cadastrando...
+        } @else {
+          Cadastrar
+        }
+      </button>
+    </form>
+
+    <p class="mt-6 text-center text-sm text-gray-600">
+      Já tem conta?
+      <a routerLink="/auth/login" class="font-medium text-primary hover:underline">Entrar</a>
+    </p>
+  </div>
+</div>
