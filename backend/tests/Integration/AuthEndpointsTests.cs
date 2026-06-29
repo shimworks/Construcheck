@@ -338,7 +338,7 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
         var request = new HttpRequestMessage(HttpMethod.Put,
             $"/api/auth/users/{Guid.NewGuid()}/roles")
         {
-            Content = JsonContent.Create(new { roles = new[] { "Viewer" } })
+            Content = JsonContent.Create(new { roles = new[] { 1 } })
         };
         request.Headers.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", adminToken);
@@ -364,7 +364,7 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
         var request = new HttpRequestMessage(HttpMethod.Put,
             $"/api/auth/users/{targetUserId}/roles")
         {
-            Content = JsonContent.Create(new { roles = new[] { "Admin" } })
+            Content = JsonContent.Create(new { roles = new[] { 0 } })
         };
         request.Headers.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", adminToken);

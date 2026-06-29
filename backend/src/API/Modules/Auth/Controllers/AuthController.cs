@@ -67,7 +67,16 @@ public class AuthController(IAuthService authService) : ControllerBase
         if (!string.IsNullOrEmpty(token))
             await authService.LogoutAsync(token, ct);
 
-        Response.Cookies.Delete(RefreshTokenCookieName);
+        var isDevelopment = HttpContext.RequestServices
+            .GetRequiredService<IWebHostEnvironment>()
+            .IsDevelopment();
+
+        Response.Cookies.Delete(RefreshTokenCookieName, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = !isDevelopment,
+            SameSite = isDevelopment ? SameSiteMode.Lax : SameSiteMode.Strict,
+        });
 
         return NoContent();
     }
@@ -85,11 +94,15 @@ public class AuthController(IAuthService authService) : ControllerBase
 
     private void SetRefreshTokenCookie(string token)
     {
+        var isDevelopment = HttpContext.RequestServices
+            .GetRequiredService<IWebHostEnvironment>()
+            .IsDevelopment();
+
         Response.Cookies.Append(RefreshTokenCookieName, token, new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
+            Secure = !isDevelopment,
+            SameSite = isDevelopment ? SameSiteMode.Lax : SameSiteMode.Strict,
             Expires = DateTimeOffset.UtcNow.AddDays(
                 int.Parse(HttpContext.RequestServices
                     .GetRequiredService<IConfiguration>()["REFRESH_TOKEN_EXPIRATION_DAYS"]!))

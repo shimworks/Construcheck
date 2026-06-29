@@ -141,7 +141,8 @@ Log.Logger = new LoggerConfiguration()
         options.AddPolicy("Angular", policy =>
             policy.WithOrigins("http://localhost:4200")
                   .AllowAnyHeader()
-                  .AllowAnyMethod());
+                  .AllowAnyMethod()
+                  .AllowCredentials());
     });
 
     var app = builder.Build();
