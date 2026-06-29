@@ -14,7 +14,7 @@ WORKDIR /app-back
 # Copia a solução e os projetos para restaurar as dependências
 COPY backend/construcheck.slnx ./
 COPY backend/src/API/API.csproj backend/src/API/
-COPY backend/src/Core/Core.csproj backend/src/Core/
+# COPY backend/src/Core/Core.csproj backend/src/Core/
 COPY backend/src/SharedKernel/SharedKernel.csproj backend/src/SharedKernel/
 RUN dotnet restore backend/construcheck.slnx
 
