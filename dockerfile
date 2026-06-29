@@ -1,25 +1,25 @@
 # === STAGE 1: Build do Frontend Angular ===
 FROM node:22-alpine AS front-build
-WORKDIR /app-front
+WORKDIR /app
 # Copia arquivos de dependências baseados na raiz do repositório
-COPY frontend/package*.json ./
+COPY frontend/package*.json ./frontend/
 RUN npm ci
-COPY frontend/ ./
+COPY frontend/ ./frontend/
 # Compila o Angular gerando os arquivos de produção
 RUN npm run build -- --configuration=production
 
 # === STAGE 2: Build do Backend .NET 10 ===
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS back-build
-WORKDIR /app-back
+WORKDIR /app
 # Copia a solução e os projetos para restaurar as dependências
-COPY backend/construcheck.slnx ./
-COPY backend/src/API/API.csproj backend/src/API/
+COPY backend/construcheck.slnx ./backend/
+COPY backend/src/API/API.csproj ./backend/src/API/
 # COPY backend/src/Core/Core.csproj backend/src/Core/
-COPY backend/src/SharedKernel/SharedKernel.csproj backend/src/SharedKernel/
+COPY backend/src/SharedKernel/SharedKernel.csproj ./backend/src/SharedKernel/
 RUN dotnet restore backend/construcheck.slnx
 
 # Copia o resto do código fonte do backend e publica
-COPY backend/src/ backend/src/
+COPY backend/src/ ./backend/src/
 RUN dotnet publish backend/src/API/API.csproj -c Release -o /app/publish
 
 # === STAGE 3: Runtime Final ===
