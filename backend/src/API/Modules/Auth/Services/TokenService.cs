@@ -1,14 +1,15 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+﻿using Construcheck.API.Modules.Auth.Entities;
+using Construcheck.API.Modules.Auth.Interfaces;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using Construcheck.API.Modules.Auth.Entities;
-using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
 
 namespace Construcheck.API.Modules.Auth.Services;
 
-public class TokenService(IConfiguration configuration)
+public class TokenService(IConfiguration configuration) : ITokenService
 {
     public string GenerateAccessToken(User user)
     {

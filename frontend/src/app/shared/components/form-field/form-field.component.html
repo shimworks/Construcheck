@@ -1,0 +1,15 @@
+<div class="mb-4">
+  <label [for]="inputId()" class="mb-1 block text-sm font-medium text-gray-800">
+    {{ label() }}
+  </label>
+  <input
+    [id]="inputId()"
+    [type]="type()"
+    [placeholder]="placeholder()"
+    [formControl]="$any(control())"
+    class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+  />
+  @if (errorMessage(); as message) {
+    <p class="mt-1 text-xs text-red-600">{{ message }}</p>
+  }
+</div>

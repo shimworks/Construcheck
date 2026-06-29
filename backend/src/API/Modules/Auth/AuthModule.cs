@@ -10,7 +10,7 @@ public static class AuthModule
     {
         services.AddScoped<IAuthRepository, AuthRepository>();
         services.AddScoped<IAuthService, AuthService>();
-        services.AddScoped<TokenService>();
+        services.AddScoped<ITokenService, TokenService>();
         return services;
     }
 }

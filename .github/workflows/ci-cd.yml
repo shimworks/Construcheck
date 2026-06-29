@@ -66,8 +66,8 @@ jobs:
       - name: Build e Push da imagem Docker
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
-          file: ./backend/dockerfile
+          context: 
+          file: ./dockerfile
           push: true
           tags: ${{ secrets.ACR_LOGIN_SERVER }}/construcheck-api:${{ github.sha }}
 

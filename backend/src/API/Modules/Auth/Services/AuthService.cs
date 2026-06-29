@@ -2,11 +2,10 @@
 using Construcheck.API.Modules.Auth.Entities;
 using Construcheck.API.Modules.Auth.Interfaces;
 using Construcheck.SharedKernel;
-using Microsoft.AspNetCore.Identity.Data;
 
 namespace Construcheck.API.Modules.Auth.Services;
 
-public class AuthService(IAuthRepository repository, TokenService tokenService) : IAuthService
+public class AuthService(IAuthRepository repository, ITokenService tokenService) : IAuthService
 {
     public async Task<Result<bool>> RegisterAsync(RegisterUserRequest request, CancellationToken ct = default)
     {
@@ -35,7 +34,7 @@ public class AuthService(IAuthRepository repository, TokenService tokenService) 
         return Result<bool>.Success(true);
     }
 
-    public async Task<Result<AuthResponse>> LoginAsync(LoginRequest request, CancellationToken ct = default)
+    public async Task<Result<AuthResponse>> LoginAsync(LoginUserRequest request, CancellationToken ct = default)
     {
         var user = await repository.GetByEmailAsync(request.Email, ct);
         if (user is null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
