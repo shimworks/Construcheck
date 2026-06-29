@@ -185,10 +185,16 @@ Log.Logger = new LoggerConfiguration()
     }
 
     app.UseExceptionHandler();
+
+    app.UseDefaultFiles(); 
+    app.UseStaticFiles();
+
     app.UseCors("Angular");
     app.UseAuthentication();
     app.UseAuthorization();
     app.MapControllers();
+
+    app.MapFallbackToFile("index.html");
 
     app.Run();
 //}
