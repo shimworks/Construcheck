@@ -1,22 +1,19 @@
 # === STAGE 1: Build do Frontend Angular ===
 FROM node:22-alpine AS front-build
-WORKDIR /app
+WORKDIR /app/frontend
 # Copia arquivos de dependências baseados na raiz do repositório
-COPY frontend/package*.json ./frontend/
+COPY frontend/package*.json ./
 RUN npm ci
-COPY frontend/ ./frontend/
+COPY frontend/ ./
 # Compila o Angular gerando os arquivos de produção
 RUN npm run build -- --configuration=production
 
 # === STAGE 2: Build do Backend .NET 10 ===
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS back-build
-WORKDIR /app
-# Copia a solução e os projetos para restaurar as dependências
-COPY backend/construcheck.slnx ./backend/
-COPY backend/src/API/API.csproj ./backend/src/API/
-# COPY backend/src/Core/Core.csproj backend/src/Core/
-COPY backend/src/SharedKernel/SharedKernel.csproj ./backend/src/SharedKernel/
-RUN dotnet restore backend/construcheck.slnx
+WORKDIR /app/backend
+COPY backend/src/API/API.csproj ./src/API/
+COPY backend/src/SharedKernel/SharedKernel.csproj ./src/SharedKernel/
+RUN dotnet restore src/API/API.csproj
 
 # Copia o resto do código fonte do backend e publica
 COPY backend/src/ ./backend/src/
@@ -33,6 +30,6 @@ COPY --from=back-build /app/publish .
 
 # Copia o frontend compilado do Stage 1 direto para a pasta wwwroot do .NET
 # NOTA: Verifique se no angular.json a pasta de saída é exatamente dist/construcheck/browser
-COPY --from=front-build /app-front/dist/construcheck/browser ./wwwroot
+COPY --from=front-build /app/frontend/dist/construcheck/browser ./wwwroot
 
 ENTRYPOINT ["dotnet", "API.dll"]
