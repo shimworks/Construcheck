@@ -1,8 +1,11 @@
 services:
+  # ==========================================
+  # 1. APLICATIVO (Front + Back em um só Container)
+  # ==========================================
   api:
     build:
-      context: ./backend
-      dockerfile: dockerfile
+      context: .
+      dockerfile: ./dockerfile
     ports:
       - "8080:8080"
     env_file:
@@ -13,6 +16,9 @@ services:
     networks:
       - construcheck-network
 
+  # ==========================================
+  # 2. BANCO DE DADOS (SQL Server)
+  # ==========================================
   db:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:

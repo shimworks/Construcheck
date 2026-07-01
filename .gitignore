@@ -61,7 +61,9 @@ nunit-*.xml
 bin/
 obj/
 .vs
-.env*
+.env
+.env.azure
+.env.all
 
 # Logs do Serilog
 logs/
