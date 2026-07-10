@@ -52,16 +52,16 @@ O backend segue uma arquitetura **Modulith** (monólito modular): cada módulo d
 ```
 backend/
   src/
-    API/                 # entry point da aplicação; referencia Core e SharedKernel
+    API/                 # entry point da aplicação
       Controllers/
       Data/               # AppDbContext
       Extensions/
       Middleware/         # GlobalExceptionHandler
       Modules/
-        Auth/             # infraestrutura da API (não é candidato a microserviço)
+        Auth/
       Program.cs
-    Core/                 # domínio de negócio, candidato a microserviço
-    SharedKernel/         # primitivos transversais, sem dependência de ASP.NET
+    Core/                 # domínio de negócio
+    SharedKernel/         # primitivos transversais
   tests/
     Unit/
     Integration/
