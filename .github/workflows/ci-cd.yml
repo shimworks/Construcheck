@@ -83,9 +83,9 @@ jobs:
           imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/construcheck-api:${{ github.sha }}
           targetPort: 8080
           secrets: >
-            db-password-secret=keyvaultref:https://construcheckvault.vault.azure.net/secrets/DB-PASSWORD/61aaaf29d5fb41beab6514cda118e63f
-            jwt-secret-secret=keyvaultref:https://construcheckvault.vault.azure.net/secrets/JWT-SECRET/148db44880e84d49980d27d676012bb9
-            fakecon=keyvaultref:https://construcheckvault.vault.azure.net/secrets/fakecon/78372bddb0114129a2f191d95a36740f
+            db-password-secret=keyvaultref:https://construcheckvaultfree.vault.azure.net/secrets/DB-PASSWORD/54925a54f1d041928a240209a82771e1
+            jwt-secret-secret=keyvaultref:https://construcheckvaultfree.vault.azure.net/secrets/JWT-SECRET/fc3867a1739a4c22a754b7b206d08bfb
+            fakecon=keyvaultref:https://construcheckvaultfree.vault.azure.net/secrets/Connection-String/3417db359a114ab294bac79955541a2c
           environmentVariables: >
             ASPNETCORE_ENVIRONMENT=Production
             ASPNETCORE_URLS=http://+:8080
