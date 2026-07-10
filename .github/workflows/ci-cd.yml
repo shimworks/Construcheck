@@ -52,7 +52,7 @@ jobs:
         id: kv_secrets
         with:
           inlineScript: |
-            ACR_PWD=$(az keyvault secret show --name "ACR-PASSWORD" --vault-name "construcheckvault" --query value -o tsv)
+            ACR_PWD=$(az keyvault secret show --name "ACR-PASSWORD" --vault-name "construcheckvaultfree" --query value -o tsv)
             echo "::add-mask::$ACR_PWD"
             echo "ACR-PASSWORD=$ACR_PWD" >> $GITHUB_OUTPUT
 
