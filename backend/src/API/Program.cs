@@ -1,5 +1,7 @@
 using Construcheck.API.Data;
 using Construcheck.API.Modules.Auth;
+using Construcheck.Core;
+using Construcheck.Core.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -69,6 +71,7 @@ Log.Logger = new LoggerConfiguration()
             "TrustServerCertificate=True;";
     }
 
+    builder.Services.AddScoped<ICoreDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
     // Banco de dados com retry automático para falhas transientes em runtime
     builder.Services.AddDbContext<AppDbContext>(options =>
@@ -99,9 +102,11 @@ Log.Logger = new LoggerConfiguration()
 
     builder.Services.AddAuthorization();
     builder.Services.AddAuthModule();
+    builder.Services.AddCoreModule();
+    builder.Services.AddScoped<ICoreDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
-    // Exception Handler centralizado
-    builder.Services.AddExceptionHandler<Construcheck.API.Middleware.GlobalExceptionHandler>();
+// Exception Handler centralizado
+builder.Services.AddExceptionHandler<Construcheck.API.Middleware.GlobalExceptionHandler>();
     builder.Services.AddProblemDetails();
 
     builder.Services.AddControllers();

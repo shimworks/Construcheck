@@ -26,6 +26,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\API\API.csproj" />
     <ProjectReference Include="..\..\src\SharedKernel\SharedKernel.csproj" />
+    <ProjectReference Include="..\..\src\Core\Core.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,14 +1,31 @@
 ﻿using Construcheck.API.Modules.Auth.Entities;
+using Construcheck.Core.Data;
+using Construcheck.Core.Projects.Entities;
+using Construcheck.Core.Teams.Entities;
+using Construcheck.Core.Contracts.Entities;
+using Construcheck.Core.Budget.Entities;
+using Construcheck.Core.Schedule.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Construcheck.API.Data;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options), ICoreDbContext
 {
+    // Auth
     public DbSet<User> Users => Set<User>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
+    // Core
+    public DbSet<Project> Projects => Set<Project>();
+    public DbSet<Team> Teams => Set<Team>();
+    public DbSet<Contract> Contracts => Set<Contract>();
+    public DbSet<BudgetItem> BudgetItems => Set<BudgetItem>();
+    public DbSet<SchedulePhase> SchedulePhases => Set<SchedulePhase>();
+    public DbSet<Activity> Activities => Set<Activity>();
+    public DbSet<Dependency> Dependencies => Set<Dependency>();
+    public DbSet<Milestone> Milestones => Set<Milestone>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -75,6 +92,83 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             }
         );
 
+        ConfigureCoreEntities(modelBuilder);
+
         base.OnModelCreating(modelBuilder);
+    }
+
+    private static void ConfigureCoreEntities(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Project>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.Name).IsRequired().HasMaxLength(200);
+            entity.Property(p => p.Address).HasMaxLength(300);
+            entity.Property(p => p.TechnicalManager).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<Team>(entity =>
+        {
+            entity.HasKey(t => t.Id);
+            entity.Property(t => t.Name).IsRequired().HasMaxLength(150);
+            entity.HasIndex(t => t.ProjectId);
+        });
+
+        modelBuilder.Entity<Contract>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.CounterpartyName).IsRequired().HasMaxLength(200);
+            entity.Property(c => c.Value).HasColumnType("decimal(18,2)");
+            entity.HasIndex(c => c.ProjectId);
+            entity.HasIndex(c => c.DueDate); // usado pela Fase 7 (Alertas)
+        });
+
+        modelBuilder.Entity<BudgetItem>(entity =>
+        {
+            entity.HasKey(i => i.Id);
+            entity.Property(i => i.Description).IsRequired().HasMaxLength(300);
+            entity.Property(i => i.Quantity).HasColumnType("decimal(18,4)");
+            entity.Property(i => i.UnitPrice).HasColumnType("decimal(18,2)");
+            entity.Ignore(i => i.TotalValue); // calculado, não persiste
+            entity.HasIndex(i => i.ProjectId);
+        });
+
+        modelBuilder.Entity<SchedulePhase>(entity =>
+        {
+            entity.HasKey(s => s.Id);
+            entity.Property(s => s.Name).IsRequired().HasMaxLength(100);
+            entity.HasMany(s => s.Activities)
+                  .WithOne(a => a.SchedulePhase)
+                  .HasForeignKey(a => a.SchedulePhaseId);
+        });
+
+        modelBuilder.Entity<Activity>(entity =>
+        {
+            entity.HasKey(a => a.Id);
+            entity.Property(a => a.Name).IsRequired().HasMaxLength(200);
+        });
+
+        // Dependency tem duas FKs para Activity — Restrict nas duas, senão o SQL Server
+        // recusa a migration por causa de múltiplos caminhos de cascade delete na mesma tabela
+        modelBuilder.Entity<Dependency>(entity =>
+        {
+            entity.HasKey(d => d.Id);
+
+            entity.HasOne(d => d.Activity)
+                  .WithMany(a => a.Dependencies)
+                  .HasForeignKey(d => d.ActivityId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(d => d.PredecessorActivity)
+                  .WithMany()
+                  .HasForeignKey(d => d.PredecessorActivityId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Milestone>(entity =>
+        {
+            entity.HasKey(m => m.Id);
+            entity.Property(m => m.Name).IsRequired().HasMaxLength(150);
+        });
     }
 }
