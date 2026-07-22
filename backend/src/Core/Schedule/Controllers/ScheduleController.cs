@@ -65,12 +65,4 @@ public class ScheduleController(IScheduleService scheduleService) : ControllerBa
         var result = await scheduleService.AddDependencyAsync(id, request, ct);
         return result.ToActionResult(this);
     }
-
-    [HttpPost("projects/{projectId:guid}/milestones")]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> CreateMilestone(Guid projectId, [FromBody] CreateMilestoneRequest request, CancellationToken ct)
-    {
-        var result = await scheduleService.CreateMilestoneAsync(projectId, request, ct);
-        return result.ToActionResult(this);
-    }
 }

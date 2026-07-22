@@ -177,38 +177,16 @@ public class ScheduleService(
         return Result<bool>.Success(true);
     }
 
-    public async Task<Result<MilestoneResponse>> CreateMilestoneAsync(Guid projectId, CreateMilestoneRequest request, CancellationToken ct = default)
-    {
-        var project = await projectRepository.GetByIdAsync(projectId, ct);
-        if (project is null)
-            return Result<MilestoneResponse>.NotFound("Obra não encontrada.");
-
-        var milestone = new Milestone
-        {
-            Id = Guid.NewGuid(),
-            ProjectId = projectId,
-            Name = request.Name,
-            PlannedDate = request.PlannedDate,
-            Achieved = false
-        };
-
-        await repository.AddMilestoneAsync(milestone, ct);
-        await repository.SaveChangesAsync(ct);
-
-        return Result<MilestoneResponse>.Success(ToMilestoneResponse(milestone));
-    }
-
     public async Task<Result<ScheduleResponse>> GetByProjectIdAsync(Guid projectId, CancellationToken ct = default)
     {
         var phases = await repository.GetPhasesByProjectIdAsync(projectId, ct);
-        var milestones = await repository.GetMilestonesByProjectIdAsync(projectId, ct);
 
         var phasesResponse = new List<SchedulePhaseResponse>();
         foreach (var phase in phases)
             phasesResponse.Add(await ToPhaseResponseAsync(phase, ct));
 
         return Result<ScheduleResponse>.Success(
-            new ScheduleResponse(phasesResponse, milestones.Select(ToMilestoneResponse).ToList()));
+            new ScheduleResponse(phasesResponse));
     }
 
     private async Task<SchedulePhaseResponse> ToPhaseResponseAsync(SchedulePhase phase, CancellationToken ct)
@@ -231,7 +209,4 @@ public class ScheduleService(
             activity.ActualStartDate, activity.ActualEndDate, activity.Status,
             dependencies.Select(d => d.PredecessorActivityId).ToList());
     }
-
-    private static MilestoneResponse ToMilestoneResponse(Milestone milestone) => new(
-        milestone.Id, milestone.Name, milestone.PlannedDate, milestone.ActualDate, milestone.Achieved);
 }

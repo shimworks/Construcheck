@@ -17,9 +17,5 @@ public interface IScheduleRepository
 
     Task<List<Dependency>> GetActivityDependenciesAsync(Guid activityId, CancellationToken ct = default);
     Task AddDependencyAsync(Dependency dependency, CancellationToken ct = default);
-
-    Task<List<Milestone>> GetMilestonesByProjectIdAsync(Guid projectId, CancellationToken ct = default);
-    Task AddMilestoneAsync(Milestone milestone, CancellationToken ct = default);
-
     Task SaveChangesAsync(CancellationToken ct = default);
 }

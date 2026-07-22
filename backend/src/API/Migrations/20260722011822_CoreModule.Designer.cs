@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260720131019_CoreModule")]
+    [Migration("20260722011822_CoreModule")]
     partial class CoreModule
     {
         /// <inheritdoc />
@@ -324,34 +324,6 @@ namespace API.Migrations
                     b.HasIndex("PredecessorActivityId");
 
                     b.ToTable("Dependencies");
-                });
-
-            modelBuilder.Entity("Construcheck.Core.Schedule.Entities.Milestone", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<bool>("Achieved")
-                        .HasColumnType("bit");
-
-                    b.Property<DateOnly?>("ActualDate")
-                        .HasColumnType("date");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<DateOnly>("PlannedDate")
-                        .HasColumnType("date");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Milestones");
                 });
 
             modelBuilder.Entity("Construcheck.Core.Schedule.Entities.SchedulePhase", b =>

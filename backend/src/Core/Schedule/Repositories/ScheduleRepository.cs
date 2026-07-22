@@ -43,12 +43,6 @@ public class ScheduleRepository(ICoreDbContext db) : IScheduleRepository
     public async Task AddDependencyAsync(Dependency dependency, CancellationToken ct = default) =>
         await db.Dependencies.AddAsync(dependency, ct);
 
-    public Task<List<Milestone>> GetMilestonesByProjectIdAsync(Guid projectId, CancellationToken ct = default) =>
-        db.Milestones.Where(m => m.ProjectId == projectId).ToListAsync(ct);
-
-    public async Task AddMilestoneAsync(Milestone milestone, CancellationToken ct = default) =>
-        await db.Milestones.AddAsync(milestone, ct);
-
     public Task SaveChangesAsync(CancellationToken ct = default) =>
         db.SaveChangesAsync(ct);
 }

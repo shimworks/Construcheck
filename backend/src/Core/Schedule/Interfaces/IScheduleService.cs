@@ -12,5 +12,4 @@ public interface IScheduleService
     Task<Result<ActivityResponse>> UpdateActivityAsync(Guid id, UpdateActivityRequest request, CancellationToken ct = default);
     Task<Result<bool>> ReorderActivitiesAsync(Guid phaseId, ReorderActivitiesRequest request, CancellationToken ct = default);
     Task<Result<bool>> AddDependencyAsync(Guid activityId, CreateDependencyRequest request, CancellationToken ct = default);
-    Task<Result<MilestoneResponse>> CreateMilestoneAsync(Guid projectId, CreateMilestoneRequest request, CancellationToken ct = default);
 }

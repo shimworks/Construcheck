@@ -16,7 +16,5 @@ public interface ICoreDbContext
     DbSet<SchedulePhase> SchedulePhases { get; }
     DbSet<Activity> Activities { get; }
     DbSet<Dependency> Dependencies { get; }
-    DbSet<Milestone> Milestones { get; }
-
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }

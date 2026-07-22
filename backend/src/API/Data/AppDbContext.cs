@@ -25,7 +25,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<SchedulePhase> SchedulePhases => Set<SchedulePhase>();
     public DbSet<Activity> Activities => Set<Activity>();
     public DbSet<Dependency> Dependencies => Set<Dependency>();
-    public DbSet<Milestone> Milestones => Set<Milestone>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -163,12 +162,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                   .WithMany()
                   .HasForeignKey(d => d.PredecessorActivityId)
                   .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<Milestone>(entity =>
-        {
-            entity.HasKey(m => m.Id);
-            entity.Property(m => m.Name).IsRequired().HasMaxLength(150);
         });
     }
 }
