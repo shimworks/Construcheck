@@ -1,0 +1,3 @@
+﻿namespace Construcheck.Construction.Application.Teams.DTOs;
+
+public record UpdateTeamRequest(string Name, string? Specialty, int MemberCount);

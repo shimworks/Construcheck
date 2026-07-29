@@ -1,0 +1,3 @@
+﻿namespace Construcheck.Construction.Application.Teams.DTOs;
+
+public record TeamResponse(Guid Id, Guid ProjectId, string Name, string? Specialty, int MemberCount);

@@ -1,14 +1,12 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/API/API.csproj" />
-    <Project Path="src/Core/Core.csproj" />
     <Project Path="src/SharedKernel/SharedKernel.csproj" />
-  </Folder>
-  <Folder Name="/tests/" />
-  <Folder Name="/tests/Integration/">
-    <Project Path="tests/Integration/Construcheck.Integration.Tests.csproj" />
-  </Folder>
-  <Folder Name="/tests/Unit/">
-    <Project Path="tests/Unit/Construcheck.Unit.Tests.csproj" />
+    <Project Path="src/Auth.Domain/Auth.Domain.csproj" />
+    <Project Path="src/Auth.Application/Auth.Application.csproj" />
+    <Project Path="src/Auth.Infrastructure/Auth.Infrastructure.csproj" />
+    <Project Path="src/Construction.Domain/Construction.Domain.csproj" />
+    <Project Path="src/Construction.Application/Construction.Application.csproj" />
+    <Project Path="src/Construction.Infrastructure/Construction.Infrastructure.csproj" />
+    <Project Path="src/API/API.csproj" />
   </Folder>
 </Solution>
