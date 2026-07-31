@@ -42,7 +42,7 @@ public static class WbsTemplateSeed
                 // Create() valida DateRange internamente; com start == end (placeholder),
                 // isso sempre passa, então .Value! é seguro aqui.
                 var activityResult = Activity.Create(
-                    phase.Id, activityNames[activityIndex], activityIndex + 1, today, today);
+                    projectId, phase.Id, activityNames[activityIndex], activityIndex + 1, today, today);
 
                 activities.Add(activityResult.Value!);
             }

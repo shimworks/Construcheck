@@ -122,6 +122,10 @@ public class ConstructionDbContext(DbContextOptions<ConstructionDbContext> optio
             entity.Property(a => a.Name).IsRequired().HasMaxLength(200);
             entity.HasIndex(a => a.SchedulePhaseId);
 
+            // Índice composto: a query de recálculo em cascata (GetByPredecessorIdAsync)
+            // sempre filtra por ProjectId + DeletionStatus juntos.
+            entity.HasIndex(a => new { a.ProjectId, a.DeletionStatus });
+
             entity.ComplexProperty(a => a.PlannedPeriod, period =>
             {
                 period.Property(p => p.Start).HasColumnName("PlannedStartDate");

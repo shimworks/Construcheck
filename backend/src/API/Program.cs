@@ -4,6 +4,24 @@ using Construcheck.Auth.Domain;
 using Construcheck.Auth.Infrastructure.Persistence;
 using Construcheck.Auth.Infrastructure.Repositories;
 using Construcheck.Auth.Infrastructure.Services;
+using Construcheck.Construction.Application.Budget.Interfaces;
+using Construcheck.Construction.Application.Budget.Services;
+using Construcheck.Construction.Application.Contracts.Interfaces;
+using Construcheck.Construction.Application.Contracts.Services;
+using Construcheck.Construction.Application.Projects.Interfaces;
+using Construcheck.Construction.Application.Projects.Services;
+using Construcheck.Construction.Application.Schedule.Interfaces;
+using Construcheck.Construction.Application.Schedule.Services;
+using Construcheck.Construction.Application.Teams.Interfaces;
+using Construcheck.Construction.Application.Teams.Services;
+using Construcheck.Construction.Domain.Budget;
+using Construcheck.Construction.Domain.Contracts;
+using Construcheck.Construction.Domain.Projects;
+using Construcheck.Construction.Domain.Schedule;
+using Construcheck.Construction.Domain.Schedule.DomainServices;
+using Construcheck.Construction.Domain.Teams;
+using Construcheck.Construction.Infrastructure.Persistence;
+using Construcheck.Construction.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -86,13 +104,36 @@ builder.Services.AddScoped<IAuthApplicationService, AuthApplicationService>();
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
 
 // ==================== BOUNDED CONTEXT: CONSTRUCTION ====================
-// PENDENTE — Construction.Domain ainda não tem as 5 entidades de negócio migradas.
-// Este bloco será preenchido com:
-//   - builder.Services.AddDbContext<ConstructionDbContext>(...)
-//   - builder.Services.AddScoped<IProjectRepository, ProjectRepository>();
-//   - builder.Services.AddScoped<IProjectApplicationService, ProjectApplicationService>();
-//   - (e equivalentes para Schedule, Budget, Contracts, Teams)
-// Program.cs NÃO deve ser considerado completo até este bloco ser preenchido.
+
+builder.Services.AddDbContext<ConstructionDbContext>(options =>
+    options.UseSqlServer(connectionString, sqlOptions =>
+    {
+        sqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(10),
+            errorNumbersToAdd: null);
+    }));
+
+// Repositories
+builder.Services.AddScoped<IProjectRepository, ProjectRepository>();
+builder.Services.AddScoped<ITeamRepository, TeamRepository>();
+builder.Services.AddScoped<IContractRepository, ContractRepository>();
+builder.Services.AddScoped<IBudgetItemRepository, BudgetItemRepository>();
+builder.Services.AddScoped<IActivityRepository, ActivityRepository>();
+builder.Services.AddScoped<ISchedulePhaseRepository, SchedulePhaseRepository>();
+
+// Application Services
+builder.Services.AddScoped<IProjectApplicationService, ProjectApplicationService>();
+builder.Services.AddScoped<ITeamApplicationService, TeamApplicationService>();
+builder.Services.AddScoped<IContractApplicationService, ContractApplicationService>();
+builder.Services.AddScoped<IBudgetApplicationService, BudgetApplicationService>();
+builder.Services.AddScoped<IScheduleApplicationService, ScheduleApplicationService>();
+
+// Domain Services (Schedule) — stateless, escopo por requisição é suficiente
+builder.Services.AddScoped<ActivityStartValidationService>();
+builder.Services.AddScoped<ActivityCascadeRescheduleService>();
+builder.Services.AddScoped<ActivityReorderService>();
+builder.Services.AddScoped<SchedulePhaseDeletionService>();
 
 // JWT
 var jwtSecret = builder.Configuration["JWT_SECRET"]!;
@@ -178,6 +219,10 @@ if (!app.Environment.IsEnvironment("Testing"))
             {
                 var authDb = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
                 authDb.Database.Migrate();
+
+                var constructionDb = scope.ServiceProvider.GetRequiredService<ConstructionDbContext>();
+                constructionDb.Database.Migrate();
+
                 break;
             }
             catch (Exception ex)

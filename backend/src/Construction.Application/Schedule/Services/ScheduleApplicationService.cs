@@ -83,7 +83,7 @@ public class ScheduleApplicationService(
             : existingActivities.Where(a => a.DeletionStatus == ActivityDeletionStatus.Active).Max(a => a.Order) + 1;
 
         var activityResult = Activity.Create(
-            phaseId, request.Name, nextOrder, request.PlannedStartDate, request.PlannedEndDate);
+            phase.ProjectId, phaseId, request.Name, nextOrder, request.PlannedStartDate, request.PlannedEndDate);
 
         if (activityResult.IsFailure)
             return Result<ActivityResponse>.Validation(activityResult.Error);
@@ -157,7 +157,7 @@ public class ScheduleApplicationService(
         var outcome = completeResult.Value!;
         if (outcome.WasLate)
         {
-            var cascadeResult = await cascadeRescheduleService.RecalculateAsync(activity.Id, outcome.CompletionDate, ct);
+            var cascadeResult = await cascadeRescheduleService.RecalculateAsync(activity.ProjectId, activity.Id, outcome.CompletionDate, ct);
             if (cascadeResult.IsFailure)
                 return Result<ActivityResponse>.Validation(cascadeResult.Error);
 

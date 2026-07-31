@@ -6,6 +6,7 @@ namespace Construcheck.Construction.Domain.Schedule;
 public class Activity
 {
     public Guid Id { get; private set; }
+    public Guid ProjectId { get; private set; }
     public Guid SchedulePhaseId { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public int Order { get; private set; }
@@ -20,8 +21,15 @@ public class Activity
 
     private Activity() { }
 
+    /// <summary>
+    /// ProjectId é denormalizado a partir da SchedulePhase para permitir consultas
+    /// eficientes por projeto (ex: recálculo em cascata) sem precisar navegar
+    /// SchedulePhaseId -> SchedulePhase -> ProjectId a cada leitura. Como Activity nunca
+    /// migra entre fases de projetos diferentes, esse campo nunca é alterado após a criação,
+    /// eliminando o risco de dessincronia.
+    /// </summary>
     public static Result<Activity> Create(
-        Guid schedulePhaseId, string name, int order, DateOnly plannedStart, DateOnly plannedEnd)
+        Guid projectId, Guid schedulePhaseId, string name, int order, DateOnly plannedStart, DateOnly plannedEnd)
     {
         var periodResult = DateRange.Create(plannedStart, plannedEnd);
         if (periodResult.IsFailure)
@@ -30,6 +38,7 @@ public class Activity
         var activity = new Activity
         {
             Id = Guid.NewGuid(),
+            ProjectId = projectId,
             SchedulePhaseId = schedulePhaseId,
             Name = name,
             Order = order,
@@ -42,7 +51,7 @@ public class Activity
     }
 
     public static Activity Reconstitute(
-        Guid id, Guid schedulePhaseId, string name, int order,
+        Guid id, Guid projectId, Guid schedulePhaseId, string name, int order,
         DateOnly plannedStart, DateOnly plannedEnd,
         DateOnly? actualStart, DateOnly? actualEnd,
         ActivityStatus status, ActivityDeletionStatus deletionStatus,
@@ -51,6 +60,7 @@ public class Activity
         var activity = new Activity
         {
             Id = id,
+            ProjectId = projectId,
             SchedulePhaseId = schedulePhaseId,
             Name = name,
             Order = order,

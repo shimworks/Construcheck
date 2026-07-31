@@ -10,16 +10,17 @@ namespace Construcheck.Construction.Domain.Schedule.DomainServices;
 /// </summary>
 public class ActivityCascadeRescheduleService(IActivityRepository activityRepository)
 {
-    public async Task<Result<bool>> RecalculateAsync(Guid activityId, DateOnly newEndDate, CancellationToken ct = default)
+    public async Task<Result<bool>> RecalculateAsync(
+        Guid projectId, Guid activityId, DateOnly newEndDate, CancellationToken ct = default)
     {
         var visited = new HashSet<Guid> { activityId };
-        return await RecalculateInternalAsync(activityId, newEndDate, visited, ct);
+        return await RecalculateInternalAsync(projectId, activityId, newEndDate, visited, ct);
     }
 
     private async Task<Result<bool>> RecalculateInternalAsync(
-        Guid activityId, DateOnly newEndDate, HashSet<Guid> visited, CancellationToken ct)
+        Guid projectId, Guid activityId, DateOnly newEndDate, HashSet<Guid> visited, CancellationToken ct)
     {
-        var dependents = await activityRepository.GetByPredecessorIdAsync(activityId, ct);
+        var dependents = await activityRepository.GetByPredecessorIdAsync(projectId, activityId, ct);
 
         foreach (var dependent in dependents)
         {
@@ -37,7 +38,7 @@ public class ActivityCascadeRescheduleService(IActivityRepository activityReposi
             if (rescheduleResult.IsFailure)
                 return rescheduleResult;
 
-            var cascadeResult = await RecalculateInternalAsync(dependent.Id, newDependentEnd, visited, ct);
+            var cascadeResult = await RecalculateInternalAsync(projectId, dependent.Id, newDependentEnd, visited, ct);
             if (cascadeResult.IsFailure)
                 return cascadeResult;
         }
