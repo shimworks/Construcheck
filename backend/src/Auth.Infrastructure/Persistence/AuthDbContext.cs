@@ -87,4 +87,56 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
 
         base.OnModelCreating(modelBuilder);
     }
+
+    /// <summary>
+    /// Antes de persistir, resolve o EntityState correto de todo RefreshToken rastreado.
+    ///
+    /// O EF Core, ao descobrir uma entidade através de navegação (não via DbSet.Add
+    /// direto), decide entre Added/Modified usando uma convenção baseada em: a chave
+    /// primária já tem valor não-padrão? Como RefreshToken.Id é um Guid gerado em código
+    /// (RefreshToken.Create), essa convenção sempre marca Modified, mesmo para tokens
+    /// genuinamente novos — sem correção, isso causa DbUpdateConcurrencyException
+    /// ("entity does not exist in the store") ao tentar UPDATE de algo que nunca existiu.
+    ///
+    /// A correção não pode se basear só em EntityState == Modified, porque um token
+    /// genuinamente já existente (revogado via Revoke() em RefreshAsync/LogoutAsync)
+    /// também aparece como Modified — forçá-lo para Added causaria erro de chave
+    /// duplicada ao tentar inserir de novo algo que já está no banco.
+    ///
+    /// A única forma inequívoca de diferenciar os dois casos é perguntar ao banco
+    /// diretamente (AsNoTracking, ignorando a Identity Map local) se aquele Id já
+    /// está persistido.
+    /// </summary>
+    public override int SaveChanges(bool acceptAllChangesOnSuccess) =>
+        SaveChangesAsync(acceptAllChangesOnSuccess).GetAwaiter().GetResult();
+
+    public override async Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        await ResolveRefreshTokenStatesAsync(cancellationToken);
+        return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private async Task ResolveRefreshTokenStatesAsync(CancellationToken ct)
+    {
+        foreach (var tokenEntry in ChangeTracker.Entries<RefreshToken>().ToList())
+        {
+            if (tokenEntry.State != EntityState.Modified && tokenEntry.State != EntityState.Detached)
+                continue;
+
+            if (tokenEntry.State == EntityState.Detached)
+            {
+                tokenEntry.State = EntityState.Added;
+                continue;
+            }
+
+            var tokenId = tokenEntry.Entity.Id;
+            var alreadyPersisted = await RefreshTokens
+                .AsNoTracking()
+                .AnyAsync(t => t.Id == tokenId, ct);
+
+            if (!alreadyPersisted)
+                tokenEntry.State = EntityState.Added;
+        }
+    }
 }

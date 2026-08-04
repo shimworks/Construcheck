@@ -1,14 +1,14 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using Construcheck.API.Modules.Auth.Entities;
-using Construcheck.API.Modules.Auth.Services;
+using Construcheck.Auth.Domain;
+using Construcheck.Auth.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
 
 namespace Construcheck.Unit.Tests.Auth.Services;
 
 public class TokenServiceTests
 {
-    private readonly TokenService _sut;
+    private readonly JwtTokenService _sut;
 
     private const string Secret = "construcheck-super-secret-key-for-tests-with-256-bits!!";
     private const string Issuer = "construcheck-test";
@@ -29,7 +29,7 @@ public class TokenServiceTests
             })
             .Build();
 
-        _sut = new TokenService(configuration);
+        _sut = new JwtTokenService(configuration);
     }
 
     // -------------------------------------------------------------------------
@@ -82,7 +82,7 @@ public class TokenServiceTests
         // Assert
         var email = jwt.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Email);
         Assert.NotNull(email);
-        Assert.Equal(user.Email, email.Value);
+        Assert.Equal(user.Email.Value, email.Value);
     }
 
     [Fact]
@@ -225,26 +225,21 @@ public class TokenServiceTests
     // Helpers
     // -------------------------------------------------------------------------
 
-    private static User BuildUserWithRole(string roleName) => new()
+    private static User BuildUserWithRole(string roleName)
     {
-        Id = Guid.NewGuid(),
-        Email = "user@test.com",
-        UserRoles =
-        [
-            new UserRole { Role = new Role { Name = roleName } }
-        ]
-    };
+        var user = User.Create("user@test.com", "Password123!").Value!;
+        var role = Role.Create(Guid.NewGuid(), roleName, $"Role de teste: {roleName}");
+        user.AssignRole(role);
+        return user;
+    }
 
-    private static User BuildUserWithTwoRoles(string role1, string role2) => new()
+    private static User BuildUserWithTwoRoles(string role1Name, string role2Name)
     {
-        Id = Guid.NewGuid(),
-        Email = "user@test.com",
-        UserRoles =
-        [
-            new UserRole { Role = new Role { Name = role1 } },
-            new UserRole { Role = new Role { Name = role2 } }
-        ]
-    };
+        var user = User.Create("user@test.com", "Password123!").Value!;
+        user.AssignRole(Role.Create(Guid.NewGuid(), role1Name, $"Role de teste: {role1Name}"));
+        user.AssignRole(Role.Create(Guid.NewGuid(), role2Name, $"Role de teste: {role2Name}"));
+        return user;
+    }
 
     private static JwtSecurityToken ReadToken(string token) =>
         new JwtSecurityTokenHandler().ReadJwtToken(token);

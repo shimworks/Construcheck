@@ -26,6 +26,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\API\API.csproj" />
     <ProjectReference Include="..\..\src\SharedKernel\SharedKernel.csproj" />
+    <ProjectReference Include="..\..\src\Auth.Domain\Auth.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Auth.Infrastructure\Auth.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

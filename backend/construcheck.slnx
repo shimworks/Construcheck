@@ -9,4 +9,8 @@
     <Project Path="src/Construction.Infrastructure/Construction.Infrastructure.csproj" />
     <Project Path="src/API/API.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Unit/Construcheck.Unit.Tests.csproj" />
+    <Project Path="tests/Integration/Construcheck.Integration.Tests.csproj" />
+  </Folder>
 </Solution>

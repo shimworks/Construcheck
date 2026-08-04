@@ -1,8 +1,6 @@
-using Construcheck.API.Data;
-using Construcheck.API.Modules.Auth.Entities;
+using Construcheck.Auth.Domain;
 using Construcheck.Integration.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -26,6 +24,16 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
         var response = await _client.PostAsJsonAsync("/api/auth/register", request);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Register_ShouldReturn400_WhenPasswordIsWeak()
+    {
+        var request = new { email = $"weak-pass-{Guid.NewGuid()}@test.com", password = "weak" };
+
+        var response = await _client.PostAsJsonAsync("/api/auth/register", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -58,12 +66,15 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
         var email = $"viewer-{Guid.NewGuid()}@test.com";
         await RegisterUser(email, "Password123!");
 
-        using var db = factory.CreateDbContext();
+        using var db = factory.CreateAuthDbContext();
         var user = db.Users
-            .Where(u => u.Email == email)
+            .Include(u => u.UserRoles)
+            .ThenInclude(ur => ur.Role)
+            .AsEnumerable()
+            .Where(u => u.Email.Value == email)
             .Select(u => new
             {
-                u.Email,
+                Email = u.Email.Value,
                 Roles = u.UserRoles.Select(ur => ur.Role.Name).ToList()
             })
             .FirstOrDefault();
@@ -189,17 +200,17 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
         refreshRequest.Headers.Add("Cookie", cookieValue);
         await _client.SendAsync(refreshRequest);
 
-        // Assert — token original revogado, novo ativo
-        using var db = factory.CreateDbContext();
-        var user = db.Users.First(u => u.Email == email);
-        var tokens = db.RefreshTokens
-            .AsNoTracking()
-            .Where(t => t.UserId == user.Id)
-            .ToList();
+        // Assert — token original revogado, novo ativo (RefreshToken agora é lido
+        // via o User dono, não como tabela solta — carregamento explícito necessário)
+        using var db = factory.CreateAuthDbContext();
+        var user = db.Users
+            .Include(u => u.RefreshTokens)
+            .AsEnumerable()
+            .First(u => u.Email.Value == email);
 
-        Assert.True(tokens.Count >= 2);
-        Assert.Contains(tokens, t => t.IsRevoked);
-        Assert.Contains(tokens, t => !t.IsRevoked);
+        Assert.True(user.RefreshTokens.Count >= 2);
+        Assert.Contains(user.RefreshTokens, t => t.IsRevoked);
+        Assert.Contains(user.RefreshTokens, t => !t.IsRevoked);
     }
 
     // -------------------------------------------------------------------------
@@ -256,13 +267,13 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.NoContent, logoutResponse.StatusCode);
 
         // Assert
-        using var db = factory.CreateDbContext();
-        var user = db.Users.First(u => u.Email == email);
-        var token = db.RefreshTokens
-            .AsNoTracking()
-            .First(t => t.UserId == user.Id);
+        using var db = factory.CreateAuthDbContext();
+        var user = db.Users
+            .Include(u => u.RefreshTokens)
+            .AsEnumerable()
+            .First(u => u.Email.Value == email);
 
-        Assert.True(token.IsRevoked);
+        Assert.True(user.RefreshTokens.First().IsRevoked);
     }
 
     [Fact]
@@ -357,8 +368,8 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
         var targetEmail = $"target-{Guid.NewGuid()}@test.com";
         await RegisterUser(targetEmail, "Password123!");
 
-        using var db = factory.CreateDbContext();
-        var targetUserId = db.Users.First(u => u.Email == targetEmail).Id;
+        using var db = factory.CreateAuthDbContext();
+        var targetUserId = db.Users.AsEnumerable().First(u => u.Email.Value == targetEmail).Id;
 
         // Act
         var request = new HttpRequestMessage(HttpMethod.Put,
@@ -374,9 +385,13 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        using var db2 = factory.CreateDbContext();
-        var currentRoles = db2.UserRoles
-            .Where(ur => ur.UserId == targetUserId)
+        using var db2 = factory.CreateAuthDbContext();
+        var currentRoles = db2.Users
+            .Include(u => u.UserRoles)
+            .ThenInclude(ur => ur.Role)
+            .AsEnumerable()
+            .First(u => u.Id == targetUserId)
+            .UserRoles
             .Select(ur => ur.Role.Name)
             .ToList();
 
@@ -405,13 +420,18 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
         await RegisterUser(email, password);
 
         // Promove para Admin diretamente no banco
-        using var db = factory.CreateDbContext();
-        var user = db.Users.First(u => u.Email == email);
+        using var db = factory.CreateAuthDbContext();
+        var user = db.Users
+            .Include(u => u.UserRoles)
+            .AsEnumerable()
+            .First(u => u.Email.Value == email);
         var adminRole = db.Roles.First(r => r.Name == "Admin");
 
-        db.UserRoles.RemoveRange(db.UserRoles.Where(ur => ur.UserId == user.Id));
-        db.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = adminRole.Id });
-        await db.SaveChangesAsync();
+        var replaceResult = user.ReplaceRoles([adminRole]);
+        if (replaceResult.IsFailure)
+            throw new InvalidOperationException($"Falha ao promover usuário de teste a Admin: {replaceResult.Error}");
+
+        db.SaveChanges();
 
         return await GetAccessToken(email, password);
     }

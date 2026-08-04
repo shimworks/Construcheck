@@ -82,8 +82,15 @@ public class ConstructionDbContext(DbContextOptions<ConstructionDbContext> optio
                 term.Property(t => t.End).HasColumnName("DueDate");
             });
 
-            // Índice sobre a coluna real (DueDate) — usado pela Fase 7 (Alertas)
-            entity.HasIndex("DueDate");
+            // NOTA: índice sobre DueDate removido. HasIndex() não consegue referenciar
+            // uma coluna dentro de ComplexProperty nesta versão do EF Core — nem por
+            // expressão lambda (c => c.Term.End) nem por nome de coluna em string
+            // ("DueDate"), ambas testadas e ambas falharam ao gerar a migration.
+            // A funcionalidade que usaria esse índice (Fase 7 - Alertas de vencimento)
+            // nunca foi implementada, então essa remoção não afeta nada funcional hoje.
+            // Quando essa feature for implementada, revisitar: possivelmente exigirá
+            // trocar Term de ComplexProperty para OwnsOne, que tem suporte mais maduro
+            // a indexação de propriedades aninhadas.
         });
     }
 

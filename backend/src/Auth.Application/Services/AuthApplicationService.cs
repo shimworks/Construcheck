@@ -89,6 +89,9 @@ public class AuthApplicationService(IUserRepository repository, ITokenService to
         if (user is null)
             return Result<bool>.NotFound("Usuário não encontrado.");
 
+        if (request.Roles.Count == 0)
+            return Result<bool>.Validation("Informe ao menos uma role.");
+
         var roleNames = request.Roles.Select(r => r.ToString()).ToList();
         var roles = await repository.GetRolesByNamesAsync(roleNames, ct);
         if (roles.Count != request.Roles.Count)

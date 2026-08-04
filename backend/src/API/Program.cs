@@ -90,14 +90,23 @@ else
 
 // ==================== BOUNDED CONTEXT: AUTH ====================
 
-builder.Services.AddDbContext<AuthDbContext>(options =>
-    options.UseSqlServer(connectionString, sqlOptions =>
-    {
-        sqlOptions.EnableRetryOnFailure(
-            maxRetryCount: 5,
-            maxRetryDelay: TimeSpan.FromSeconds(10),
-            errorNumbersToAdd: null);
-    }));
+// Em ambiente de Testing, o registro de SQL Server é pulado por completo —
+// CustomWebApplicationFactory registra AuthDbContext com InMemory por conta própria.
+// Isso evita o conflito "dois providers registrados no mesmo IServiceProvider":
+// tentar registrar SQL Server aqui e depois removê-lo na Factory de teste não
+// funciona de forma confiável, porque AddDbContext registra serviços de provider
+// compartilhados que não são amarrados exclusivamente a um único DbContext.
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddDbContext<AuthDbContext>(options =>
+        options.UseSqlServer(connectionString, sqlOptions =>
+        {
+            sqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(10),
+                errorNumbersToAdd: null);
+        }));
+}
 
 builder.Services.AddScoped<IUserRepository, AuthRepository>();
 builder.Services.AddScoped<IAuthApplicationService, AuthApplicationService>();
@@ -105,14 +114,17 @@ builder.Services.AddScoped<ITokenService, JwtTokenService>();
 
 // ==================== BOUNDED CONTEXT: CONSTRUCTION ====================
 
-builder.Services.AddDbContext<ConstructionDbContext>(options =>
-    options.UseSqlServer(connectionString, sqlOptions =>
-    {
-        sqlOptions.EnableRetryOnFailure(
-            maxRetryCount: 5,
-            maxRetryDelay: TimeSpan.FromSeconds(10),
-            errorNumbersToAdd: null);
-    }));
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddDbContext<ConstructionDbContext>(options =>
+        options.UseSqlServer(connectionString, sqlOptions =>
+        {
+            sqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(10),
+                errorNumbersToAdd: null);
+        }));
+}
 
 // Repositories
 builder.Services.AddScoped<IProjectRepository, ProjectRepository>();
