@@ -62,8 +62,8 @@ builder.Host.UseSerilog((context, services, configuration) =>
             rollingInterval: RollingInterval.Day,
             retainedFileCountLimit: 7));
 
-// Connection string — mesma lógica original; Cenário A confirmado: um banco físico,
-// dois DbContext (AuthDbContext e, futuramente, ConstructionDbContext) apontando pra ele
+// Connection string — Criado manualmente para evitar problema de injeção de variaveis de ambiente no github Actions. Problema corrigido utilizando Azure Key Vault. A conexão com o banco de dados deverá ser feita utilizando a variável de ambiente que é configurada no Azure Key Vault.
+// O correto seria usar o builder.Configuration.GetConnectionString("DefaultConnection")
 string connectionString = string.Empty;
 var server = builder.Configuration["DB_SERVER"];
 var port = builder.Configuration["DB_PORT"];
@@ -215,9 +215,7 @@ app.UseSerilogRequestLogging(options =>
     options.MessageTemplate = "{RequestMethod} {RequestPath} respondeu {StatusCode} em {Elapsed:0.0000}ms";
 });
 
-// Aplica migrations com retry — tolera banco momentaneamente indisponível no startup.
-// NOTA: com dois DbContext, cada um migra independentemente. ConstructionDbContext.Migrate()
-// será adicionado aqui quando essa camada existir.
+// Aplica migrations com retry
 if (!app.Environment.IsEnvironment("Testing"))
 {
     using (var scope = app.Services.CreateScope())
