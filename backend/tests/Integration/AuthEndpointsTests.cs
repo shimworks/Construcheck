@@ -84,6 +84,22 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
         Assert.Contains("Viewer", user.Roles);
     }
 
+    [Fact]
+    public async Task Register_ShouldReturn409_WhenEmailDiffersOnlyByCaseOrWhitespace()
+    {
+        // Arrange
+        var baseEmail = $"case-test-{Guid.NewGuid()}@test.com";
+        await RegisterUser(baseEmail, "Password123!");
+
+        // Act — mesmo e-mail, mas em caixa alta e com espaços nas bordas.
+        var variantEmail = $"  {baseEmail.ToUpperInvariant()}  ";
+        var response = await _client.PostAsJsonAsync("/api/auth/register",
+            new { email = variantEmail, password = "Password123!" });
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
     // -------------------------------------------------------------------------
     // POST /api/auth/login
     // -------------------------------------------------------------------------
@@ -191,26 +207,91 @@ public class AuthEndpointsTests(CustomWebApplicationFactory factory)
 
         var loginResponse = await _client.PostAsJsonAsync("/api/auth/login",
             new { email, password = "Password123!" });
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
 
         var cookieValue = ExtractRefreshTokenCookie(loginResponse);
         Assert.NotNull(cookieValue);
+        var originalTokenValue = Uri.UnescapeDataString(cookieValue!.Substring(cookieValue.IndexOf('=') + 1));
 
         // Act — primeiro refresh
         var refreshRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
         refreshRequest.Headers.Add("Cookie", cookieValue);
         await _client.SendAsync(refreshRequest);
 
-        // Assert — token original revogado, novo ativo (RefreshToken agora é lido
-        // via o User dono, não como tabela solta — carregamento explícito necessário)
+        // Assert — o token ORIGINAL, especificamente, está revogado; e existe
+        // exatamente um token novo ativo (não "dois ou mais", como o teste antigo permitia).
         using var db = factory.CreateAuthDbContext();
         var user = db.Users
             .Include(u => u.RefreshTokens)
             .AsEnumerable()
             .First(u => u.Email.Value == email);
 
-        Assert.True(user.RefreshTokens.Count >= 2);
-        Assert.Contains(user.RefreshTokens, t => t.IsRevoked);
-        Assert.Contains(user.RefreshTokens, t => !t.IsRevoked);
+        var originalTokenAfterRefresh = user.RefreshTokens.SingleOrDefault(t => t.Token == originalTokenValue);
+        Assert.NotNull(originalTokenAfterRefresh);
+        Assert.True(originalTokenAfterRefresh.IsRevoked);
+
+        var activeTokens = user.RefreshTokens.Where(t => !t.IsRevoked).ToList();
+        Assert.Single(activeTokens);
+        Assert.NotEqual(originalTokenValue, activeTokens[0].Token);
+    }
+
+    [Fact]
+    public async Task Refresh_ShouldNotMixUpTokens_WhenTwoUsersRefreshConcurrently()
+    {
+        // Arrange — dois usuários distintos, cada um com seu próprio refresh token válido.
+        var emailA = $"concurrent-a-{Guid.NewGuid()}@test.com";
+        var emailB = $"concurrent-b-{Guid.NewGuid()}@test.com";
+        await RegisterUser(emailA, "Password123!");
+        await RegisterUser(emailB, "Password123!");
+
+        var loginA = await _client.PostAsJsonAsync("/api/auth/login", new { email = emailA, password = "Password123!" });
+        var loginB = await _client.PostAsJsonAsync("/api/auth/login", new { email = emailB, password = "Password123!" });
+
+        Assert.Equal(HttpStatusCode.OK, loginA.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, loginB.StatusCode);
+
+        var cookieA = ExtractRefreshTokenCookie(loginA);
+        var cookieB = ExtractRefreshTokenCookie(loginB);
+        Assert.NotNull(cookieA);
+        Assert.NotNull(cookieB);
+
+        var requestA = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
+        requestA.Headers.Add("Cookie", cookieA);
+
+        var requestB = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
+        requestB.Headers.Add("Cookie", cookieB);
+
+        // Act — dispara as duas requisições de refresh ao mesmo tempo.
+        var responseATask = _client.SendAsync(requestA);
+        var responseBTask = _client.SendAsync(requestB);
+        await Task.WhenAll(responseATask, responseBTask);
+
+        var responseA = await responseATask;
+        var responseB = await responseBTask;
+
+        // Assert — as duas tiveram sucesso, e cada uma gerou um novo refresh token
+        // pertencente ao usuário correto no banco (não ao outro usuário concorrente).
+        Assert.Equal(HttpStatusCode.OK, responseA.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, responseB.StatusCode);
+
+        var newCookieA = ExtractRefreshTokenCookie(responseA);
+        var newCookieB = ExtractRefreshTokenCookie(responseB);
+        Assert.NotNull(newCookieA);
+        Assert.NotNull(newCookieB);
+        var newTokenValueA = Uri.UnescapeDataString(newCookieA!.Substring(newCookieA.IndexOf('=') + 1));
+        var newTokenValueB = Uri.UnescapeDataString(newCookieB!.Substring(newCookieB.IndexOf('=') + 1));
+
+        Assert.NotEqual(newTokenValueA, newTokenValueB);
+
+        using var db = factory.CreateAuthDbContext();
+        var userA = db.Users.Include(u => u.RefreshTokens).AsEnumerable().First(u => u.Email.Value == emailA);
+        var userB = db.Users.Include(u => u.RefreshTokens).AsEnumerable().First(u => u.Email.Value == emailB);
+
+        Assert.Contains(userA.RefreshTokens, t => t.Token == newTokenValueA && !t.IsRevoked);
+        Assert.Contains(userB.RefreshTokens, t => t.Token == newTokenValueB && !t.IsRevoked);
+        // O token novo de A nunca pode aparecer nos tokens de B, e vice-versa.
+        Assert.DoesNotContain(userA.RefreshTokens, t => t.Token == newTokenValueB);
+        Assert.DoesNotContain(userB.RefreshTokens, t => t.Token == newTokenValueA);
     }
 
     // -------------------------------------------------------------------------

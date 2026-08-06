@@ -78,6 +78,56 @@ public class AuthServiceTests
     }
 
     [Fact]
+    public async Task RegisterAsync_ShouldSucceed_WhenPasswordIsExactlyMinimumLength()
+    {
+        // Arrange — boundary: HashedPassword.ValidatePolicy usa "Length < MinLength" (MinLength = 8).
+        // "Passwo1!" tem exatamente 8 caracteres, maiúscula, número e símbolo — deve passar,
+        // já que 8 < 8 é falso. Nenhum teste existente cobria esse limite exato; só havia
+        // "weak" (claramente inválida) e senhas óbvias mais longas.
+        const string exactlyEightChars = "Passwo1!";
+        Assert.Equal(8, exactlyEightChars.Length); // guarda contra o teste ficar obsoleto se a string mudar
+
+        var request = new RegisterUserRequest("boundary@test.com", exactlyEightChars);
+        var viewerRole = Role.Create(Guid.NewGuid(), "Viewer", "Acesso somente leitura.");
+
+        _repository.GetByEmailAsync(request.Email, Arg.Any<CancellationToken>())
+                   .Returns((User?)null);
+        _repository.GetRoleByNameAsync("Viewer", Arg.Any<CancellationToken>())
+                   .Returns(viewerRole);
+
+        // Act
+        var result = await _sut.RegisterAsync(request);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        await _repository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RegisterAsync_ShouldReturnValidation_WhenPasswordIsOneCharacterBelowMinimumLength()
+    {
+        // Arrange — o outro lado do boundary: 7 caracteres deve falhar (7 < 8 é verdadeiro).
+        // Par com o teste acima; sem este, o boundary de RegisterAsync_ShouldSucceed_WhenPasswordIsExactlyMinimumLength
+        // não prova que o limite está no lugar certo, só que 8 funciona.
+        const string sevenChars = "Passwo1";
+        Assert.Equal(7, sevenChars.Length);
+
+        var request = new RegisterUserRequest("boundary-fail@test.com", sevenChars);
+        _repository.GetByEmailAsync(request.Email, Arg.Any<CancellationToken>())
+                   .Returns((User?)null);
+        _repository.GetRoleByNameAsync("Viewer", Arg.Any<CancellationToken>())
+                   .Returns(Role.Create(Guid.NewGuid(), "Viewer", "Acesso somente leitura."));
+
+        // Act
+        var result = await _sut.RegisterAsync(request);
+
+        // Assert
+        Assert.True(result.IsFailure);
+        Assert.Equal(ResultErrorType.Validation, result.ErrorType);
+        Assert.Contains("no mínimo 8 caracteres", result.Error);
+    }
+
+    [Fact]
     public async Task RegisterAsync_ShouldCreateUser_WithViewerRole()
     {
         // Arrange
@@ -414,6 +464,59 @@ public class AuthServiceTests
         // Assert
         Assert.True(result.IsFailure);
         Assert.Equal(ResultErrorType.Validation, result.ErrorType);
+    }
+
+    [Fact]
+    public async Task UpdateUserRolesAsync_ShouldReturnValidation_WhenRequestedRolesContainDuplicates()
+    {
+        // Arrange — request pede a mesma role duas vezes: [Admin, Admin].
+        // O repositório real busca por NOME (GetRolesByNamesAsync), então nomes duplicados
+        // resolvem para uma única Role distinta — o mock replica esse comportamento devolvendo
+        // uma lista de 1 mesmo para uma requisição de 2 nomes, como o repositório real faria.
+        // Isso dispara a checagem existente "roles.Count != request.Roles.Count" (1 != 2),
+        // então o resultado esperado é falha por Validation — não um "sucesso silencioso"
+        // colapsando para uma lista de 1, como se poderia supor sem ler o código de perto.
+        var user = User.Create("user@test.com", "Password123!").Value!;
+        var adminRole = Role.Create(Guid.NewGuid(), "Admin", "Acesso total.");
+        var request = new UpdateUserRolesRequest([RoleType.Admin, RoleType.Admin]);
+
+        _repository.GetByIdAsync(user.Id, Arg.Any<CancellationToken>())
+                   .Returns(user);
+        _repository.GetRolesByNamesAsync(Arg.Any<List<string>>(), Arg.Any<CancellationToken>())
+                   .Returns([adminRole]); // repositório real dedupe por nome: 2 nomes iguais -> 1 role
+
+        // Act
+        var result = await _sut.UpdateUserRolesAsync(user.Id, request);
+
+        // Assert
+        Assert.True(result.IsFailure);
+        Assert.Equal(ResultErrorType.Validation, result.ErrorType);
+        Assert.Equal("Uma ou mais roles informadas não existem.", result.Error);
+        await _repository.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void ReplaceRoles_ShouldAllowDuplicateUserRoleEntries_WhenSameRolePassedTwice()
+    {
+        // Arrange — este é um teste de DOMÍNIO (User.ReplaceRoles), não do Application Service.
+        // Achado relevante: User.ReplaceRoles não filtra duplicata por conta própria — ele confia
+        // inteiramente em quem chama (o Application Service, via checagem de contagem acima) para
+        // nunca passar uma lista com Role repetida. Se ReplaceRoles for chamado diretamente com
+        // a MESMA Role duas vezes (contornando o Application Service), ele aceita e cria duas
+        // entradas UserRole com o mesmo RoleId — não há Distinct() nem checagem de RoleId repetido
+        // dentro do método. Este teste documenta esse comportamento atual explicitamente, para que
+        // uma futura mudança de comportamento (adicionar proteção) seja uma decisão consciente,
+        // não uma regressão silenciosa.
+        var user = User.Create("user@test.com", "Password123!").Value!;
+        var adminRole = Role.Create(Guid.NewGuid(), "Admin", "Acesso total.");
+
+        // Act
+        var result = user.ReplaceRoles([adminRole, adminRole]);
+
+        // Assert — comportamento atual documentado: aceita e duplica, não filtra.
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, user.UserRoles.Count);
+        Assert.All(user.UserRoles, ur => Assert.Equal(adminRole.Id, ur.RoleId));
     }
 
     [Fact]
