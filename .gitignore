@@ -65,6 +65,7 @@ obj/
 .env.azure
 .env.all
 Overview.md
+*ToDo.md
 
 # Logs do Serilog
 logs/

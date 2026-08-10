@@ -28,7 +28,7 @@ public class AuthServiceTests
     {
         // Arrange
         var request = new RegisterUserRequest("user@test.com", "Password123!");
-        var existingUser = User.Create("user@test.com", "Password123!").Value!;
+        var existingUser = User.Create("user@test.com", "Password123!").Value;
         _repository.GetByEmailAsync(request.Email, Arg.Any<CancellationToken>())
                    .Returns(existingUser);
 

@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="NSubstitute" Version="5.3.0" />
@@ -28,6 +29,9 @@
     <ProjectReference Include="..\..\src\Auth.Domain\Auth.Domain.csproj" />
     <ProjectReference Include="..\..\src\Auth.Application\Auth.Application.csproj" />
     <ProjectReference Include="..\..\src\Auth.Infrastructure\Auth.Infrastructure.csproj" />
+	<ProjectReference Include="..\..\src\Construction.Application\Construction.Application.csproj" />
+	<ProjectReference Include="..\..\src\Construction.Domain\Construction.Domain.csproj" />
+	<ProjectReference Include="..\..\src\Construction.Infrastructure\Construction.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
