@@ -1,4 +1,5 @@
 ﻿using Construcheck.Auth.Domain;
+using Construcheck.Auth.Domain.ValueObjects;
 using Construcheck.Auth.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,13 +7,17 @@ namespace Construcheck.Auth.Infrastructure.Repositories;
 
 public class AuthRepository(AuthDbContext db) : IUserRepository
 {
-    public Task<User?> GetByEmailAsync(string email, CancellationToken ct = default)
+    public async Task<User?> GetByEmailAsync(string email, CancellationToken ct = default)
     {
-        var normalized = email.ToLowerInvariant().Trim();
-        return db.Users
+
+        var emailResult = Email.Create(email);
+        if (emailResult.IsFailure)
+            return null; // e-mail malformado nunca vai bater com nada no banco
+
+        return await db.Users
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
-            .FirstOrDefaultAsync(u => u.Email.Value == normalized, ct);
+            .FirstOrDefaultAsync(u => u.Email == emailResult.Value, ct);
     }
 
     public Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
